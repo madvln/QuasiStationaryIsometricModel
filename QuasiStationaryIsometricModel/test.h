@@ -2,19 +2,13 @@
 const double g = 9.8, pi = 3.14;
 class simple_equations;
 
+struct simple_struct {
+	double L; double D; double delta_d; double delta;
+	double z_0; double z_L; double rho; double nu; double p_n; double Q; double p_0; double p_L;
+};
+
 class simple_equations {
 public:
-	/*simple_equations(double L, double D, double delta_d, double delta,
-		double z_0, double z_L, double rho, double nu, double p_n, double Q)
-	{
-		count_d(D, delta_d);
-		count_epsilon(delta);
-		count_v(Q);
-		count_Re(nu);
-		count_lambda();
-		count_p_0(L, z_0, z_L, rho, p_n);
-		count_p_L(L, z_0, z_L, rho, p_n);
-	}*/
 
 	void count_d(double D, double delta_d)
 	{
@@ -61,21 +55,19 @@ public:
 		return hydr_res;
 	}
 
-	void count_p_0(double L, double D, double delta_d, double delta,
-		double z_0, double z_L, double rho, double nu, double p_n, double Q)
+	double get_p_0(simple_struct pimple_)
 	{
-		count_d(D, delta_d);
-		count_epsilon(delta);
-		count_v(Q);
-		count_Re(nu);
+		
+		count_d(pimple_.D, pimple_.delta_d);
+		count_epsilon(pimple_.delta);
+		count_v(pimple_.Q);
+		count_Re(pimple_.nu);
 		count_lambda();
-		p_c_0 = ((p_n / (rho * g)) + z_L - z_0 + (hydr_res * L * speed * speed) / (diam_vnutr * 2 * g))
-			* (rho * g);
+		pimple_.p_0 = ((pimple_.p_n / (pimple_.rho * g)) + pimple_.z_L - pimple_.z_0 + (hydr_res * pimple_.L * speed * speed) / (diam_vnutr * 2 * g))
+			* (pimple_.rho * g);
+		return pimple_.p_0;
 	}
-	double get_p_0()
-	{
-		return p_c_0;
-	}
+
 
 	void count_p_L(double L, double z_0, double z_L, double rho, double p_n)
 	{
@@ -121,10 +113,11 @@ TEST(MOC_Solver, Task_1)
 	//начальные условия
 	double L = 80e3, D = 0.72, delta_d = 0.01,
 		delta = 15e-6, z_0 = 50, z_L = 100,
-		rho = 870, nu = 15e-6, p_L = 0.6e6, Q = 0.972;
+		rho = 870, nu = 15e-6, p_L = 0.6e6, Q = 0.972, p_0;
 	simple_equations simple;
-	simple.count_p_0(L, D, delta_d, delta, z_0, z_L, rho, nu, p_L, Q);
-	double p_0 = simple.get_p_0();
+	simple_struct pimple{ L,D,delta_d, delta, z_0, z_L, rho, nu, Q, p_0, p_L};
+	simple.count_p_0(pimple);
+	p_0 = simple.get_p_0();
 }
 
 TEST(MOC_Solver, Task_2)
@@ -132,8 +125,10 @@ TEST(MOC_Solver, Task_2)
 	//начальные условия
 	double L = 80e3, D = 0.72, delta_d = 0.01,
 		delta = 15e-6, z_0 = 50, z_L = 100,
-		rho = 870, nu = 15e-6, p_0 = 5e6, p_L = 0.8e6;
+		rho = 870, nu = 15e-6, Q, p_0 = 5e6, p_L = 0.8e6;
 	simple_equations simple;
+	simple_struct pimple{L,D,delta_d, delta, z_0, z_L, rho, nu, Q, p_0, p_L};
+	pimple.D;
 	simple.count_Q(L, D, delta_d, delta, z_0, z_L, rho, nu, p_0, p_L);
-	double Q = simple.get_Q();
+	Q = simple.get_Q();
 }
