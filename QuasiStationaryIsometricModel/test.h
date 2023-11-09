@@ -16,7 +16,7 @@ public:
 
 	void count_epsilon(double delta)//считаем шероховатость
 	{
-		sherokh = delta/diam_vnutr;
+		sherokh = delta / diam_vnutr;
 	}
 	double get_epsilon()//выводим шероховатость
 	{
@@ -25,7 +25,7 @@ public:
 
 	void count_v(double Q)//считаем скорость
 	{
-		speed = (4*Q)/(diam_vnutr * diam_vnutr * pi);
+		speed = (4 * Q) / (diam_vnutr * diam_vnutr * pi);
 	}
 	double get_v()//выводим скорость
 	{
