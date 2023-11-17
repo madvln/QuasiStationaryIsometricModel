@@ -1,5 +1,5 @@
 #pragma once
-const double g = 9.8, pi = 3.14;
+const double g = 9.81, pi = 3.14;
 class simple_equations;
 
 class simple_equations {
@@ -7,7 +7,7 @@ public:
 
 	void count_d(double D, double delta_d)//считаем внутренний диаметр
 	{
-		diam_vnutr = (D - 2 * delta_d);
+		diam_vnutr = D - 2 * delta_d;
 	}
 	double get_d()//выводим внутренний диаметр
 	{
@@ -115,25 +115,27 @@ public:
 	}
 
 	void eiler_from_start(double p_n, int n, double h, double D, double delta_d, double delta,
-		double Q, double rho, double nu)
+		double Q, double rho, double nu, double z_0, double z_L)
 	{
+		double delta_z = (z_L - z_0) / (n - 1);
 		p_c = vector<double>(n);
 		count_tau(D, delta_d, delta, Q, rho, nu);
 		p_c[0] = p_n;
 		for (int i = 1; i < n; i++)
-			p_c[i] = p_c[i - 1] + (-4/ diam_vnutr)* h * tau;
+			p_c[i] = p_c[i - 1] + h * ((-4 / diam_vnutr) * tau - rho * g * (delta_z / h));
 	}
 
 	
 
 	void eiler_from_end(double p_n, int n, double h, double D, double delta_d, double delta,
-		double Q, double rho, double nu)
+		double Q, double rho, double nu, double z_0, double z_L)
 	{
+		double delta_z = (z_L - z_0) / (n - 1);
 		p_c = vector<double>(n);
 		count_tau(D, delta_d, delta, Q, rho, nu);
-		p_c[0] = p_n;
-		for (int i = n - 1; i > 0; i--)
-			p_c[i] = p_c[i + 1] - (-4 / diam_vnutr) * h * tau;
+		p_c[n - 1] = p_n;
+		for (int i = n - 2; i >= 0; i--)
+			p_c[i] = p_c[i + 1] - h * ((-4 / diam_vnutr) * tau - rho * g * (delta_z / h));
 	}
 
 	vector<double> get_p_from_eiler()
@@ -172,17 +174,21 @@ TEST(MOC_Solver, Task_2)
 
 TEST(MOC_Solver, Task_3)
 {
-	double p_0 = 0.5e6;
+	double p_L = 0.6e6;
+	double p_0 = 5.65e6;
 	double L = 80e3; //Длина участка трубы
-	double h = 1e3; //Шаг
+	double h = 8; //Шаг
 	double D = 0.72; //внешний диаметр трубы
 	double delta_d = 0.01; //толщина стенки
 	double delta = 15e-6;
-	double Q = 0.972;
+	double Q = 3500.0 / 3600.0;
 	double rho = 870;
 	double nu = 15e-6;
+	double z_0 = 50;
+	double z_L = 100;
 	simple_equations simple; //объявляем переменную класса для расчетов
 	int n = static_cast<int>(L / h + 0.5) + 1; //Количество шагов
-	simple.eiler_from_start(p_0, n, h, D, delta_d, delta, Q, rho, nu);
+
+	simple.eiler_from_end(p_L, n, h, D, delta_d, delta, Q, rho, nu, z_0, z_L);
 	vector<double> p_profile = simple.get_p_from_eiler();
 }
