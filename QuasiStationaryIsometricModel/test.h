@@ -20,10 +20,14 @@ struct my_pipe_parameters
 	double z_0 = 100;
 
 	double z_L = 50;
-
-	my_pipe_parameters(double length, double D, double delta_d, double abs_roughness, double z_0, double z_L):
-		length{ length }, D{ D }, delta_d { delta_d }, abs_roughness { abs_roughness }, z_0 { z_0 }, z_L { z_L }
+	/// @brief Шаг сетки, (м)
+	double h = 1e3;
+	/// @brief Количество шагов
+	size_t n;
+	my_pipe_parameters(double length, double D, double delta_d, double abs_roughness, double z_0, double z_L, double h):
+		length{ length }, D{ D }, delta_d { delta_d }, abs_roughness { abs_roughness }, z_0 { z_0 }, z_L { z_L }, h{ h }
 	{
+		n = static_cast<int>(length / h + 0.5) + 1;
 	}
 };
 
@@ -40,17 +44,14 @@ struct my_task_parameters
 	double p_L = 0.6e6;
 	/// @brief Расход жидкости, (м3/с)
 	double Q = 0.972;
-	/// @brief Шаг сетки, (м)
-	double h = 1e3;
-	/// @brief Количество шагов
-	size_t n;
+
 	/// @brief Профиль давлений
 	vector<double> p_profile;
-	my_task_parameters(my_pipe_parameters& pipe, double rho, double nu, double p_0, double p_L, double Q, double h) :
-		pipe{ pipe }, rho{ rho }, nu{ nu }, p_0{ p_0 }, p_L{ p_L }, Q{ Q }, h{ h }
+	my_task_parameters(my_pipe_parameters& pipe, double rho, double nu, double p_0, double p_L, double Q) :
+		pipe{ pipe }, rho{ rho }, nu{ nu }, p_0{ p_0 }, p_L{ p_L }, Q{ Q }
 	{	
-		n = static_cast<int>(pipe.length / h + 0.5) + 1;
-		p_profile = vector<double>(n);
+
+		p_profile = vector<double>(pipe.n);
 	}
 };
 
@@ -153,29 +154,27 @@ public:
 
 	vector<double> euler_from_start()
 	{
-		double delta_z = (pipe.z_0 - pipe.z_L) / (task.n);
+		double delta_z = (pipe.z_0 - pipe.z_L) / (pipe.n - 1);
 		double speed = count_speed(task.Q, pipe.d);
 		double Re = count_Re(speed, pipe.d, task.nu);
 		double lambda = count_lambda(Re, pipe.roughness);
 		double tau = count_tau(lambda, task.rho, speed);
 		task.p_profile[0] = task.p_0;
-		for (int i = 1; i < task.n; i++)
-			task.p_profile[i] = task.p_profile[i - 1] + task.h * ((-4 / pipe.d) * tau - task.rho * g * (delta_z / task.h));
-		task.p_L = task.p_profile.back();
+		for (int i = 1; i < pipe.n; i++)
+			task.p_profile[i] = task.p_profile[i - 1] + pipe.h * ((-4 / pipe.d) * tau - task.rho * g * (delta_z / pipe.h));
 		return task.p_profile;
 	}
 
 	vector<double> euler_from_end()
 	{
-		double delta_z = (pipe.z_0 - pipe.z_L) / (task.n - 1);
+		double delta_z = (pipe.z_0 - pipe.z_L) / (pipe.n - 1);
 		double speed = count_speed(task.Q, pipe.d);
 		double Re = count_Re(speed, pipe.d, task.nu);
 		double lambda = count_lambda(Re, pipe.roughness);
 		double tau = count_tau(lambda, task.rho, speed);
-		task.p_profile[task.n - 1] = task.p_L;
-		for (int i = task.n - 2; i >= 0; i--)
-			task.p_profile[i] = task.p_profile[i + 1] - task.h * ((-4 / pipe.d) * tau - task.rho * g * (delta_z / task.h));
-		task.p_0 = task.p_profile.back();
+		task.p_profile[pipe.n - 1] = task.p_L;
+		for (int i = pipe.n - 2; i >= 0; i--)
+			task.p_profile[i] = task.p_profile[i + 1] - pipe.h * ((-4 / pipe.d) * tau - task.rho * g * (delta_z / pipe.h));
 		return task.p_profile;
 	}
 };
@@ -213,8 +212,10 @@ public:
 
 	var_type residuals(const var_type& x)
 	{
-		double pressure = x;
-		return (task.p_0 - pressure);
+		task.Q = x;
+		euler_solver e_solver(pipe, task);
+		vector<double> p_profile = e_solver.euler_from_end();
+		return (p_profile[0] - task.p_0);
 	}
 
 
@@ -231,8 +232,8 @@ TEST(MOC_Solver, Task_1)
 	simple_pipe.dx = 1e3;
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 0.0, p_L = 0.6e6, Q = 0.972;
-	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, simple_pipe.dx };
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q };
 	classic_solver simple(pipe,task);
 	p_0 = simple.QP_task();
 }
@@ -248,8 +249,8 @@ TEST(MOC_Solver, Task_2)
 	simple_pipe.dx = 1e3;
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 5e6, p_L = 0.8e6, Q = 0.0;
-	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, simple_pipe.dx };
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q };
 	classic_solver simple(pipe, task);
 	Q = simple.PP_task() * 3600;
 }
@@ -265,8 +266,8 @@ TEST(MOC_Solver, Task_3)
 	simple_pipe.dx = 1e3;
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 0.0, p_L = 0.6e6, Q = 0.972;
-	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, simple_pipe.dx };
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q };
 	euler_solver e_solver(pipe, task);
 	vector<double> p_profile = e_solver.euler_from_end();
 }
@@ -282,8 +283,8 @@ TEST(MOC_Solver, Task_4)
 	simple_pipe.dx = 1e3;
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 5e6, p_L = 0.8e6, Q = 0.0;
-	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, simple_pipe.dx };
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q };
 	newton_solver n_solver(pipe, task);
 	fixed_solver_parameters_t<1, 0> parameters;
 	// Создание структуры для записи результатов расчета
@@ -303,15 +304,12 @@ TEST(MOC_Solver, Task_5)
 	simple_pipe.dx = 1e3;
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 5e6, p_L = 0.8e6, Q = 0.0;
-	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, simple_pipe.dx };
-	euler_solver e_solver(pipe, task);
-	vector<double> p_profile = e_solver.euler_from_end();
-	double p_0_counted = task.p_0;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho , nu, p_0, p_L, Q};
 	newton_solver_2 n_solver_2(pipe, task);
 	fixed_solver_parameters_t<1, 0> parameters;
 	// Создание структуры для записи результатов расчета
 	fixed_solver_result_t<1> result;
-	fixed_newton_raphson<1>::solve_dense(n_solver_2, { p_0_counted }, parameters, &result);
-	cout << result.argument << endl;
+	fixed_newton_raphson<1>::solve_dense(n_solver_2, { 0.5 }, parameters, &result);
+	cout << result.argument * 3600 << endl;
 }
