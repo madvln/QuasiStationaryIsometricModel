@@ -43,12 +43,14 @@ struct my_task_parameters
 	/// @brief Шаг сетки, (м)
 	double h = 1e3;
 	/// @brief Количество шагов
-	double n = static_cast<int>(pipe.length / h + 0.5) + 1;
+	size_t n;
 	/// @brief Профиль давлений
-	vector<double> p_profile = vector<double>(n);
+	vector<double> p_profile;
 	my_task_parameters(my_pipe_parameters& pipe, double rho, double nu, double p_0, double p_L, double Q, double h) :
 		pipe{ pipe }, rho{ rho }, nu{ nu }, p_0{ p_0 }, p_L{ p_L }, Q{ Q }, h{ h }
-	{		
+	{	
+		n = static_cast<int>(pipe.length / h + 0.5) + 1;
+		p_profile = vector<double>(n);
 	}
 };
 
@@ -137,7 +139,7 @@ public:
 		return Q;
 	}
 };
-
+/// @brief 
 class euler_solver
 {
 	my_pipe_parameters& pipe;
