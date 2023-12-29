@@ -217,6 +217,48 @@ public:
 		return (p_profile[0] - task.p_0);
 	}
 };
+/// @brief Класс, решающий задачи PQ, QP методом Эйлера
+class euler_solver_with_MOC
+{
+	const my_pipe_parameters& pipe;
+	const my_task_parameters& task;
+public:
+	euler_solver_with_MOC(const my_pipe_parameters& pipe, const my_task_parameters& task) :
+		pipe(pipe), task(task)
+	{
+	}
+	/// @brief Метод нахождения входного давления
+	/// @return Pвх
+	vector<double> euler_solver_PQ()
+	{
+		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
+		double speed = calc_speed(task.Q, pipe.internal_diameter);
+		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
+		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double tau = calc_tau(hydraulic_resistance, task.rho, speed);
+		vector<double> p_profile = vector<double>(pipe.n);
+		p_profile[0] = task.p_0;
+		for (int i = 1; i < pipe.n; i++)
+			p_profile[i] = p_profile[i - 1] + pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho * g * (delta_z / pipe.h));
+		return p_profile;
+	}
+	/// @brief Метод нахождения выходного давления
+	/// @return Pвых
+	vector<double> euler_solver_QP()
+	{
+		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
+		double speed = calc_speed(task.Q, pipe.internal_diameter);
+		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
+		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double tau = calc_tau(hydraulic_resistance, task.rho, speed);
+		vector<double> p_profile = vector<double>(pipe.n);
+		p_profile[pipe.n - 1] = task.p_L;
+		for (int i = pipe.n - 2; i >= 0; i--)
+			p_profile[i] = p_profile[i + 1] - pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho * g * (delta_z / pipe.h));
+		return p_profile;
+	}
+};
+
 /// @brief Решение задачи PQ методом простых итераций
 TEST(MOC_Solver, Task_1)
 {
@@ -302,4 +344,79 @@ TEST(MOC_Solver, Task_5)
 	double Q_approx = 0.5;
 	fixed_newton_raphson<1>::solve_dense(n_solver, { Q_approx }, parameters, &result);
 	cout << result.argument * 3600 << endl;
+}
+
+TEST(MOC_Solver, Task_6)
+{
+	simple_pipe_properties simple_pipe;
+	simple_pipe.diameter = 0.72;
+	simple_pipe.length = 80e3;
+	simple_pipe.dx = 1e3;
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 100, z_L = 50,
+		rho = 870, nu = 15e-6, p_0 = 0.0, p_L = 0.6e6, Q = 0.972;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q };
+	std::ofstream outFile_rho("output_rho_profile.txt");
+	std::ofstream outFile_p("output_p_profile.txt");
+	double rho_in = 860;
+	double rho_out = 870;
+	double T = 30000;
+	pipe_properties_t simple_pipe_properties = pipe_properties_t::build_simple_pipe(simple_pipe);
+
+
+	string path = prepare_test_folder();
+	// Одна переменная, и структуры метода характеристик для нееm
+	typedef composite_layer_t<profile_collection_t<1>,
+		moc_solver<1>::specific_layer> single_var_moc_t;
+
+
+	vector<double> Q_profile(simple_pipe_properties.profile.getPointCount(), Q); // задаем по трубе расход 0.5 м3/с
+	PipeQAdvection advection_model(simple_pipe_properties, Q_profile);
+
+	const auto& x = advection_model.get_grid();
+	double dx = x[1] - x[0];
+	double v = advection_model.getEquationsCoeffs(0, 0);
+	double dt_ideal = abs(dx / v);
+
+	double Cr = 0.5;
+
+	PipeQAdvection advection_model(simple_pipe_properties, Q_profile);
+	ring_buffer_t<single_var_moc_t> buffer(2, simple_pipe_properties.profile.getPointCount());
+	buffer.advance(+1);
+	single_var_moc_t& prev = buffer.previous();
+	single_var_moc_t& next = buffer.current();
+	auto& rho_initial = prev.vars.point_double[0];
+	rho_initial = vector<double>(rho_initial.size(), rho);
+	task.rho = rho_initial[0];
+	euler_solver e_solver(pipe, task);
+	vector<double> p_profile = e_solver.euler_solver_QP();
+
+
+
+	double t = 0; // текущее время
+	double dt = Cr * dt_ideal; // время в долях от Куранта
+	std::stringstream filename_rho;
+	filename_rho << path << "output_rho.csv";
+	std::ofstream output_rho(filename_rho.str());
+
+	std::stringstream filename_p;
+	filename_p << path << "output_p.csv";
+	std::ofstream output_p(filename_p.str());
+
+
+	size_t N = static_cast<int>(T / dt);
+	for (size_t index = 0; index < N; ++index) {
+
+		if (index == 0) {
+			single_var_moc_t& prev = buffer.previous();
+		}
+		t += dt;
+		moc_solver<1> solver(advection_model, buffer.previous(), buffer.current());
+		solver.step_optional_boundaries(dt, rho_in, rho_out);
+		single_var_moc_t& next = buffer.current();
+		task.rho = next.vars.point_double[0][0];
+		vector<double> p_profile = e_solver.euler_solver_QP();
+		buffer.advance(+1);
+
+		}
 }
