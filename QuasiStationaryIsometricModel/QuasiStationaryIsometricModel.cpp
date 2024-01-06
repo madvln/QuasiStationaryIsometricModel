@@ -43,10 +43,3 @@ int main(int argc, char** argv) {
     int res = RUN_ALL_TESTS();
     return res;
 }
-
-inline std::string prepare_test_folder()
-{
-    std::string path = std::string("../testing_out/") + get_test_string() + "/";
-    std::filesystem::create_directories(path);
-    return path;
-}
