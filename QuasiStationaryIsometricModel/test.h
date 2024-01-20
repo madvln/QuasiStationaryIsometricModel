@@ -244,7 +244,7 @@ public:
 	/// @return Pвх
 	vector<double> euler_solver_PQ()
 	{
-		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
+		double delta_z = -(pipe.z_L - pipe.z_0) / (pipe.n - 1);
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		vector<double> p_profile = vector<double>(pipe.n);
 		p_profile[0] = task.p_0;
@@ -262,7 +262,7 @@ public:
 	/// @return Pвых
 	vector<double> euler_solver_QP()
 	{
-		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
+		double delta_z = -(pipe.z_L - pipe.z_0) / (pipe.n - 1);
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		vector<double> p_profile = vector<double>(pipe.n);
 		p_profile[pipe.n - 1] = task.p_L;
@@ -272,6 +272,7 @@ public:
 			double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
 			double tau = calc_tau(hydraulic_resistance, task.rho_profile[i], speed);
 			p_profile[i] = p_profile[i + 1] - pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho_profile[i] * g * (delta_z / pipe.h));
+
 		}
 		return p_profile;
 	}
@@ -562,13 +563,13 @@ TEST(Block_1, Task_1)
 	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {}};
 
 	vector<double> time_row = {0, 60, 120, 180, 240, 300, 360};
-	vector<double> time_rho_in_row = {880, 880, 880, 890, 890, 880, 880};
-	vector<double> time_nu_in_row = {13e-6, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
+	vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880};
+	vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
 
-	vector<double> time_rho_out_row = {880, 880, 880, 890, 890, 880, 880};
-	vector<double> time_nu_out_row = {13e-6, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
+	vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880};
+	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
 
-	vector<double> time_p_in_row = {5.8e6, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6};
+	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6};
 	vector<double> time_Q_row = vector<double>(time_row.size(), task.Q);
 
 	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
@@ -580,12 +581,8 @@ TEST(Block_1, Task_1)
 	vector<double> new_time_row;
 
 	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
+	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
 
-
-	vector<double> new_time_rho_out_row;
-	vector<double> new_time_nu_out_row;
-	vector<vector<double>> out_combined = { new_time_rho_out_row };
-	out_combined.push_back(new_time_nu_out_row);
 
 	vector<double> new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile;
 
@@ -602,9 +599,13 @@ TEST(Block_1, Task_1)
 		new_time_Q_row.push_back(task.Q);
 		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
 		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
+
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
+
 		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
 
-		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, out_combined);
+		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
 		task.rho_profile = buffer.current()[0];
 		task.nu_profile = buffer.current()[1];
 		task.p_0 = new_time_p_in_row.back();
