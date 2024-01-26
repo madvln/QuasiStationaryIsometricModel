@@ -244,7 +244,7 @@ public:
 	/// @return Pвх
 	vector<double> euler_solver_PQ()
 	{
-		double delta_z = -(pipe.z_L - pipe.z_0) / (pipe.n - 1);
+		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		vector<double> p_profile = vector<double>(pipe.n);
 		p_profile[0] = task.p_0;
@@ -262,7 +262,7 @@ public:
 	/// @return Pвых
 	vector<double> euler_solver_QP()
 	{
-		double delta_z = -(pipe.z_L - pipe.z_0) / (pipe.n - 1);
+		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		vector<double> p_profile = vector<double>(pipe.n);
 		p_profile[pipe.n - 1] = task.p_L;
@@ -275,6 +275,30 @@ public:
 
 		}
 		return p_profile;
+	}
+};
+
+class newton_solver_PP_with_euler_with_MOC : public fixed_system_t<1>
+{
+	const my_pipe_parameters& pipe;
+	const my_task_parameters& task;
+	using fixed_system_t<1>::var_type;
+public:
+	newton_solver_PP_with_euler_with_MOC(const my_pipe_parameters& pipe, const my_task_parameters& task) :
+		pipe(pipe), task(task)
+	{
+	}
+	/// @brief Задание функции невязок
+	/// @param x Искомый расход
+	/// @return Функция невязок
+	var_type residuals(const var_type& x)
+	{
+		my_task_parameters temp_task = task; // Временная структура
+		temp_task.Q = x; // во временной структуре используем Q для нашего уравнения невязки, эта Q будет идти в солвер
+		euler_solver_with_MOC e_solver(pipe, temp_task); // Объявляем переменную класса солвера Эйлером
+
+		vector<double> p_profile = e_solver.euler_solver_QP(); // Считаем профиль давлений Эйлером
+		return (p_profile[0] - task.p_0);
 	}
 };
 
@@ -365,7 +389,7 @@ TEST(MOC_Solver, Task_5)
 	cout << result.argument * 3600 << endl;
 }
 
-/// @brief тест не рабочий
+/// @brief тест не рабочий buffer.advance
 TEST(MOC_Solver, Task_6)
 {
 	simple_pipe_properties simple_pipe;
@@ -500,7 +524,7 @@ public:
 		double dt_ideal = abs(pipe.h / speed);
 		double Cr = speed * dt / pipe.h;
 // основа (для куранта 1)
-		for (size_t num_prof = 0; num_prof < layer_prev.size()-1; num_prof++)
+		for (size_t num_prof = 0; num_prof < layer_prev.size(); num_prof++)
 		{
 			if (task.Q > 0)
 			{
@@ -517,17 +541,6 @@ public:
 		}
 
 	}
-	/// @brief метод печати слоя, путь файлов - (папка с проектами)\pde_solvers\msvc
-	/// @param layer_curr слой для печати
-	/// @param filename название файла
-	//void print_layers(vector<vector<double>> layer_curr, string filename) {
-	//	ofstream fout(filename, ios::app);
-	//	for (int j = 0; j < pipe.n; j++)
-	//	{
-	//		fout << layer_curr[j] << "\t";
-	//	}
-	//	fout << "\n";
-	//}
 
 private:
 	vector<vector<double>>& layer_prev;
@@ -550,13 +563,13 @@ double linear_interpolator(vector<double> original_time, vector<double> original
 	return value1 + (value2 - value1) * (new_time_step - t1) / (t2 - t1);
 }
 
-TEST(Block_1, Task_1)
+TEST(Block_1, Task_2)
 {
 	simple_pipe_properties simple_pipe;
 	simple_pipe.diameter = 0.72;
 	simple_pipe.length = 500;
 	simple_pipe.dx = 10;
-	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 100, z_L = 50,
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 0.0, speed = 0.5;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
 	double Q = calc_flow(speed, pipe.internal_diameter);
@@ -570,7 +583,7 @@ TEST(Block_1, Task_1)
 	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
 
 	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6};
-	vector<double> time_Q_row = vector<double>(time_row.size(), task.Q);
+	vector<double> time_Q_row = { Q, 0.20, 0.21, 0.20, 0.18, 0.21, 0.21 };
 
 	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
 	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
@@ -600,8 +613,8 @@ TEST(Block_1, Task_1)
 		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
 		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
 
-		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
-		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_out_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_out_row, dt));
 
 		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
 
@@ -623,5 +636,104 @@ TEST(Block_1, Task_1)
 
 		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
 		//все готово для следующего шага, интерполированная скорость есть
-	} while ((dt - simple_moc.prepare_step()) < time_row.back());
+	} while (dt < time_row.back());
+}
+
+
+TEST(Block_1, Task_3)
+{
+	simple_pipe_properties simple_pipe;
+	simple_pipe.diameter = 0.72;
+	simple_pipe.length = 500;
+	simple_pipe.dx = 10;
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 5.5e6, Q = 0;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+
+	vector<double> time_row = { 0, 60, 120, 180, 240, 300, 360 };
+	vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880 };
+	vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
+
+	vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880 };
+	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
+
+	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6 };
+	vector<double> time_p_out_row = { p_L, 5.3e6, 5.3e6, 5.4e6, 5.4e6, 5.3e6, 5.3e6 };
+
+//	vector<double> time_Q_row = { Q, 0.20, 0.21, 0.20, 0.18, 0.21, 0.21 };
+
+	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
+	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+	buffer.advance(+1);
+	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
+	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
+
+	vector<double> new_time_row;
+
+	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
+	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
+
+	vector<double> new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile;
+
+	simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
+
+	double dt = 0;
+	
+	newton_solver_PP n_solver(pipe, task);
+	euler_solver_with_MOC e_solver(pipe, task);
+	fixed_solver_parameters_t<1, 0> parameters;
+	// Создание структуры для записи результатов расчета
+	fixed_solver_result_t<1> result;
+
+	vector<vector<double>> some_buffer;
+	size_t counter = 0;
+
+	double v_approx = 0.5;
+	double dt_debug;
+
+	do {
+		new_time_row.push_back(dt);
+
+		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
+		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
+
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_out_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_out_row, dt));
+
+		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
+		new_time_p_out_row.push_back(linear_interpolator(time_row, time_p_out_row, dt));
+
+		fixed_newton_raphson<1>::solve_dense(n_solver, { v_approx }, parameters, &result);
+
+		task.Q = calc_flow(result.argument, pipe.internal_diameter);
+		new_time_Q_row.push_back(task.Q);
+
+		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
+		task.rho_profile = buffer.current()[0];
+		task.nu_profile = buffer.current()[1];
+		task.rho = task.rho_profile[0];
+		task.nu = task.nu_profile[0];
+		task.p_0 = new_time_p_in_row.back();
+		task.p_L = new_time_p_out_row.back();
+		
+		
+
+		p_profile = e_solver.euler_solver_PQ();
+		
+
+		//buffer.advance(+1);
+
+		/////////////////////////////
+		some_buffer = buffer.current();
+		buffer.current() = buffer.previous();
+		buffer.previous() = some_buffer;
+		/////////////////////////////
+		dt_debug = simple_moc.prepare_step();
+		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
+		//все готово для следующего шага, интерполированная скорость есть
+		counter++;
+	} while (dt < time_row.back());
+
+
 }
