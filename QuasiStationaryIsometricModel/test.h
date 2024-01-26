@@ -297,8 +297,8 @@ public:
 		temp_task.Q = x; // во временной структуре используем Q для нашего уравнения невязки, эта Q будет идти в солвер
 		euler_solver_with_MOC e_solver(pipe, temp_task); // Объявляем переменную класса солвера Эйлером
 
-		vector<double> p_profile = e_solver.euler_solver_QP(); // Считаем профиль давлений Эйлером
-		return (p_profile[0] - task.p_0);
+		vector<double> p_profile = e_solver.euler_solver_PQ(); // Считаем профиль давлений Эйлером
+		return (p_profile.back() - task.p_L);
 	}
 };
 
@@ -563,7 +563,7 @@ double linear_interpolator(vector<double> original_time, vector<double> original
 	return value1 + (value2 - value1) * (new_time_step - t1) / (t2 - t1);
 }
 
-TEST(Block_1, Task_2)
+TEST(Block_3, Task_2)
 {
 	simple_pipe_properties simple_pipe;
 	simple_pipe.diameter = 0.72;
@@ -640,14 +640,14 @@ TEST(Block_1, Task_2)
 }
 
 
-TEST(Block_1, Task_3)
+TEST(Block_3, Task_3)
 {
 	simple_pipe_properties simple_pipe;
 	simple_pipe.diameter = 0.72;
 	simple_pipe.length = 500;
 	simple_pipe.dx = 10;
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
-		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 5.5e6, Q = 0;
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 5.557e6, Q = 0;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
 	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
 
@@ -659,7 +659,7 @@ TEST(Block_1, Task_3)
 	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
 
 	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6 };
-	vector<double> time_p_out_row = { p_L, 5.3e6, 5.3e6, 5.4e6, 5.4e6, 5.3e6, 5.3e6 };
+	vector<double> time_p_out_row = { p_L, 5.357e6, 5.357e6, 5.458e6, 5.458e6, 5.359e6, 5.359e6 };
 
 //	vector<double> time_Q_row = { Q, 0.20, 0.21, 0.20, 0.18, 0.21, 0.21 };
 
@@ -668,7 +668,9 @@ TEST(Block_1, Task_3)
 	buffer.advance(+1);
 	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
 	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
-
+	
+	task.rho_profile = buffer.previous()[0];
+	task.nu_profile = buffer.previous()[1];
 	vector<double> new_time_row;
 
 	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
@@ -680,7 +682,7 @@ TEST(Block_1, Task_3)
 
 	double dt = 0;
 	
-	newton_solver_PP n_solver(pipe, task);
+	newton_solver_PP_with_euler_with_MOC n_solver(pipe, task);
 	euler_solver_with_MOC e_solver(pipe, task);
 	fixed_solver_parameters_t<1, 0> parameters;
 	// Создание структуры для записи результатов расчета
@@ -689,7 +691,7 @@ TEST(Block_1, Task_3)
 	vector<vector<double>> some_buffer;
 	size_t counter = 0;
 
-	double v_approx = 0.5;
+	double Q_approx = 0.19;
 	double dt_debug;
 
 	do {
@@ -704,9 +706,9 @@ TEST(Block_1, Task_3)
 		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
 		new_time_p_out_row.push_back(linear_interpolator(time_row, time_p_out_row, dt));
 
-		fixed_newton_raphson<1>::solve_dense(n_solver, { v_approx }, parameters, &result);
+		fixed_newton_raphson<1>::solve_dense(n_solver, { Q_approx }, parameters, &result);
 
-		task.Q = calc_flow(result.argument, pipe.internal_diameter);
+		task.Q = result.argument;
 		new_time_Q_row.push_back(task.Q);
 
 		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
