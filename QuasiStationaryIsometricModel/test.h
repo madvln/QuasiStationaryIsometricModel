@@ -53,6 +53,15 @@ struct my_task_parameters
 	}
 };
 
+struct print_data {
+	vector<double> time;           // время с
+	vector<double> density;        // вытесняющая плотность кг/м3
+	vector<double> viscosity;      // вытесняющая вязкость Ст
+	vector<double> inputPressure;  // давление на входе Па
+	vector<double> outputPressure; // давление на выходе Па
+	vector<double> flowRate;       // расход м3/с
+};
+
 /// @brief Функция расчета скорости из расхода
 /// @param Q Расход, (м^3/с)
 /// @param internal_diameter Внутренний диаметр, (м)
@@ -519,7 +528,7 @@ public:
 	/// @param right_value правое граничное условие
 	void step(double time_step, double dt, vector<vector<double>> left_value, vector<vector<double>> right_value)
 	{
-// не знаю как и куда всунуть расчитанный курант
+// не знаю как и куда всунуть расчитанный курант, но тут он всегда 1, поэтому норм
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double dt_ideal = abs(pipe.h / speed);
 		double Cr = speed * dt / pipe.h;
@@ -541,7 +550,16 @@ public:
 		}
 
 	}
-
+	void print_layers(double dt, vector<double>& layer, wstring& filename) {
+		wofstream  fout(filename, ios::app | std::ios::binary | std::ios::trunc);
+		fout << std::to_wstring(dt) << L";";
+		for (int j = 0; j < layer.size(); j++)
+		{
+			fout  << std::to_wstring(layer[j]) << L";";
+		}
+		fout << L"\n";
+		fout.close();
+	}
 private:
 	vector<vector<double>>& layer_prev;
 	vector<vector<double>>& layer_curr;
@@ -563,6 +581,48 @@ double linear_interpolator(vector<double> original_time, vector<double> original
 	return value1 + (value2 - value1) * (new_time_step - t1) / (t2 - t1);
 }
 
+void print_data_to_csv(const vector<double>& time,
+	const vector<double>& rho_and_nu_in_0,
+	const vector<double>& rho_and_nu_in_1,
+	const vector<double>& time_p_in,
+	const vector<double>& time_p_out,
+	const vector<double>& time_Q,
+	const string& filename) {
+
+	// Определяем максимальную длину вектора
+	std::size_t maxLength = std::max({ time.size(), rho_and_nu_in_0.size(), rho_and_nu_in_1.size(),
+									  time_p_in.size(), time_p_out.size(), time_Q.size() });
+
+	// Открываем файл для записи
+	ofstream file(filename);
+
+	// Проверяем, открыт ли файл успешно
+	if (file.is_open()) {
+		// Записываем заголовки столбцов
+		file << "Time; Density; Viscosity; Time Pressure In; Time Pressure Out; Time Flow Rate\n";
+
+		// Определяем размер вектора времени (все векторы должны иметь одинаковый размер)
+		size_t vectorSize = time.size();
+
+		// Записываем данные из векторов
+		for (std::size_t i = 0; i < maxLength; ++i) {
+			// Если индекс находится в пределах длины вектора, записываем значение, иначе записываем пустую ячейку
+			file << (i < time.size() ? std::to_string(time[i]) : "") << ";"
+				<< (i < rho_and_nu_in_0.size() ? std::to_string(rho_and_nu_in_0[i]) : "") << ";"
+				<< (i < rho_and_nu_in_1.size() ? std::to_string(rho_and_nu_in_1[i]) : "") << ";"
+				<< (i < time_p_in.size() ? std::to_string(time_p_in[i]) : "") << ";"
+				<< (i < time_p_out.size() ? std::to_string(time_p_out[i]) : "") << ";"
+				<< (i < time_Q.size() ? std::to_string(time_Q[i]) : "") << "\n";
+		}
+
+		// Закрываем файл
+		file.close();
+		cout << "Запись прошла успешно в файл " << filename << endl;
+	}
+	else {
+		cerr << "Невозможно открыть файл " << filename << endl;
+	}
+}
 TEST(Block_3, Task_2)
 {
 	simple_pipe_properties simple_pipe;
@@ -605,6 +665,9 @@ TEST(Block_3, Task_2)
 	double dt = 0;
 	euler_solver_with_MOC e_solver(pipe, task);
 	vector<vector<double>> some_buffer;
+	wstring p_profile_file = L"p_profile.csv";
+	wstring rho_profile_file = L"rho_profile.csv";
+	wstring nu_profile_file = L"nu_profile.csv";
 
 	do {
 		new_time_row.push_back(dt);
@@ -625,7 +688,9 @@ TEST(Block_3, Task_2)
 		task.Q = new_time_Q_row.back();
 		p_profile = e_solver.euler_solver_PQ();
 		new_time_p_out_row.push_back(p_profile.back());
-		
+		simple_moc.print_layers(dt, p_profile, p_profile_file);
+		simple_moc.print_layers(dt, task.rho_profile, rho_profile_file);
+		simple_moc.print_layers(dt, task.nu_profile, nu_profile_file);
 		//buffer.advance(+1);
 
 		/////////////////////////////
@@ -637,6 +702,28 @@ TEST(Block_3, Task_2)
 		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
 		//все готово для следующего шага, интерполированная скорость есть
 	} while (dt < time_row.back());
+	
+	string filename_initial = "initial_data.csv";
+	print_data_to_csv(
+		time_row,
+		time_rho_in_row,
+		time_nu_in_row,
+		time_p_in_row,
+		{},
+		time_Q_row,
+		filename_initial
+	);
+	
+	string filename_final = "final_data.csv";
+	print_data_to_csv(
+		new_time_row,
+		rho_and_nu_in[0],
+		rho_and_nu_in[1],
+		new_time_p_in_row,
+		new_time_p_out_row,
+		new_time_Q_row,
+		filename_final
+	);
 }
 
 
