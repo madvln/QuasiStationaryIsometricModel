@@ -616,31 +616,33 @@ void print_data_to_csv(const vector<double>& time,
 	}
 }
 
-//void print_layers(const double dt, const vector<double>& layer, const wstring& filename)
-//{
-//	wofstream  file(filename, ios::app | ios::trunc);
-//	// Проверяем, открыт ли файл успешно
-//	if (file.is_open())
-//	{
-//		// Пишем первый столбец с шагом
-//		file << to_wstring(dt) << L";";
-//		for (int j = 0; j < layer.size(); j++)
-//		{
-//			file << to_wstring(layer[j]) << L";";
-//		}
-//		file << L"\n";
-//	}
-//}
 
-void print_layers(double dt, vector<double>& layer, wstring& filename) {
-	wofstream  fout(filename, ios::app | std::ios::binary | std::ios::trunc);
-	fout << std::to_wstring(dt) << L";";
-	for (int j = 0; j < layer.size(); j++)
+void print_layers(const double dt, 
+	const vector<double>& layer, 
+	const wstring& filename)
+{
+	ofstream  file(filename, ios::app);
+	if (dt == 0)
 	{
-		fout << std::to_wstring(layer[j]) << L";";
+		if (!file.is_open()) {
+			// Файл не существует, создаем новый
+			file.clear();  // Очищаем флаг ошибки
+			file.open(filename, ios::out | ios::trunc);
+		}
 	}
-	fout << L"\n";
-	fout.close();
+	if (file.is_open()) {
+		file << to_string(dt) << ";";
+		for (int j = 0; j < layer.size(); j++)
+		{
+			file << to_string(layer[j]) << ";";
+		}
+		file << "\n";
+		file.close();
+		wcout << "Запись прошла успешно в файл " << filename << endl;
+}
+	else {
+		wcerr << "Невозможно открыть файл " << filename << endl;
+	}
 }
 
 TEST(Block_3, Task_2)
