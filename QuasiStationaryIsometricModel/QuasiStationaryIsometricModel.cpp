@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 #include <fixed/fixed.h>
 #include <pde_solvers/pde_solvers.h>
+using namespace pde_solvers;
 
 
 #include <iostream>
@@ -40,6 +41,7 @@ int main(int argc, char** argv) {
 #ifdef _WIN32
     std::wcout.imbue(std::locale("rus_rus.866"));
 #endif
+    std::locale::global(std::locale("en_US.UTF-8"));
     int res = RUN_ALL_TESTS();
     return res;
 }

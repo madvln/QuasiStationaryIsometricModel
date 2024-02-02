@@ -47,11 +47,19 @@ struct my_task_parameters
 	
 	vector<double> rho_profile = vector<double>(pipe.n, rho);
 	vector<double> nu_profile = vector<double>(pipe.n, nu);
-
 	my_task_parameters(my_pipe_parameters& pipe, double rho, double nu, double p_0, double p_L, double Q, vector<double> rho_profile, vector<double> nu_profile) :
 		pipe{ pipe }, rho{ rho }, nu{ nu }, p_0{ p_0 }, p_L{ p_L }, Q{ Q }, rho_profile{ rho_profile }, nu_profile{ nu_profile }
 	{	
 	}
+};
+
+struct print_data {
+	vector<double> time;           // время с
+	vector<double> density;        // вытесняющая плотность кг/м3
+	vector<double> viscosity;      // вытесняющая вязкость Ст
+	vector<double> inputPressure;  // давление на входе Па
+	vector<double> outputPressure; // давление на выходе Па
+	vector<double> flowRate;       // расход м3/с
 };
 
 /// @brief Функция расчета скорости из расхода
@@ -254,7 +262,7 @@ public:
 			double Re = calc_Re(speed, pipe.internal_diameter, task.nu_profile[i]);
 			double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
 			double tau = calc_tau(hydraulic_resistance, task.rho_profile[i], speed);
-			p_profile[i] = p_profile[i - 1] + pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho * g * (delta_z / pipe.h));
+			p_profile[i] = p_profile[i - 1] + pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho_profile[i] * g * (delta_z / pipe.h));
 
 		}
 		return p_profile;
@@ -272,9 +280,34 @@ public:
 			double Re = calc_Re(speed, pipe.internal_diameter, task.nu_profile[i]);
 			double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
 			double tau = calc_tau(hydraulic_resistance, task.rho_profile[i], speed);
-			p_profile[i] = p_profile[i + 1] - pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho * g * (delta_z / pipe.h));
+			p_profile[i] = p_profile[i + 1] - pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho_profile[i] * g * (delta_z / pipe.h));
+
 		}
 		return p_profile;
+	}
+};
+
+class newton_solver_PP_with_euler_with_MOC : public fixed_system_t<1>
+{
+	const my_pipe_parameters& pipe;
+	const my_task_parameters& task;
+	using fixed_system_t<1>::var_type;
+public:
+	newton_solver_PP_with_euler_with_MOC(const my_pipe_parameters& pipe, const my_task_parameters& task) :
+		pipe(pipe), task(task)
+	{
+	}
+	/// @brief Задание функции невязок
+	/// @param x Искомый расход
+	/// @return Функция невязок
+	var_type residuals(const var_type& x)
+	{
+		my_task_parameters temp_task = task; // Временная структура
+		temp_task.Q = x; // во временной структуре используем Q для нашего уравнения невязки, эта Q будет идти в солвер
+		euler_solver_with_MOC e_solver(pipe, temp_task); // Объявляем переменную класса солвера Эйлером
+
+		vector<double> p_profile = e_solver.euler_solver_PQ(); // Считаем профиль давлений Эйлером
+		return (p_profile.back() - task.p_L);
 	}
 };
 
@@ -288,7 +321,7 @@ TEST(MOC_Solver, Task_1)
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 100, z_L = 50,
 		rho = 870, nu = 15e-6, p_0 = 0.0, p_L = 0.6e6, Q = 0.972;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {}};
 	simple_iterations_solver simple(pipe,task);
 	p_0 = simple.QP_task();
 	cout << p_0 << endl;
@@ -303,7 +336,7 @@ TEST(MOC_Solver, Task_2)
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 5e6, p_L = 0.8e6, Q = 0.0;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {}};
 	simple_iterations_solver simple(pipe, task);
 	Q = simple.PP_task() * 3600;
 	cout << Q << endl;
@@ -318,7 +351,7 @@ TEST(MOC_Solver, Task_3)
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 0.0, p_L = 0.6e6, Q = 0.972;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {}};
 	euler_solver e_solver(pipe, task);
 	vector<double> p_profile = e_solver.euler_solver_QP();
 	p_0 = p_profile[0];
@@ -334,7 +367,7 @@ TEST(MOC_Solver, Task_4)
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 5e6, p_L = 0.8e6, Q = 0.0;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {}};
 	newton_solver_PP n_solver(pipe, task);
 	fixed_solver_parameters_t<1, 0> parameters;
 	// Создание структуры для записи результатов расчета
@@ -354,7 +387,7 @@ TEST(MOC_Solver, Task_5)
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
 		rho = 870, nu = 15e-6, p_0 = 5e6, p_L = 0.8e6, Q = 0.0;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
-	my_task_parameters task{ pipe, rho , nu, p_0, p_L, Q, {}, {} };
+	my_task_parameters task{ pipe, rho , nu, p_0, p_L, Q, {}, {}};
 	newton_solver_PP_with_euler n_solver(pipe, task);
 	fixed_solver_parameters_t<1, 0> parameters;
 	// Создание структуры для записи результатов расчета
@@ -365,6 +398,7 @@ TEST(MOC_Solver, Task_5)
 	cout << result.argument * 3600 << endl;
 }
 
+/// @brief тест не рабочий buffer.advance
 TEST(MOC_Solver, Task_6)
 {
 	simple_pipe_properties simple_pipe;
@@ -375,12 +409,8 @@ TEST(MOC_Solver, Task_6)
 		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 0.0, speed = 0.5;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
 	double Q = calc_flow(speed, pipe.internal_diameter);
-	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
-	
-	std::ofstream outFile_rho("output_rho_profile.txt");
-	std::ofstream outFile_nu("output_nu_profile.txt");
-	std::ofstream outFile_p("output_p_profile.txt");
-	
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {}};
+
 	double rho_in = 800;
 	double rho_out = 900;
 	double nu_in = 10e-6;
@@ -419,29 +449,21 @@ TEST(MOC_Solver, Task_6)
 	nu_initial = vector<double>(nu_initial.size(), nu);
 	task.nu_profile = nu_initial;
 
-	auto& p_initial = prev.vars.point_double[2];
-	p_initial = e_solver.euler_solver_PQ();
+	prev.vars.point_double[2] = e_solver.euler_solver_PQ();
 	
 	double t = 0; // текущее время
 	double dt = Cr * dt_ideal; // время в долях от Куранта
-	std::stringstream filename_rho;
-	filename_rho << path << "output_rho.csv";
-	std::ofstream output_rho(filename_rho.str());
-
-	std::stringstream filename_nu;
-	filename_nu << path << "output_nu.csv";
-	std::ofstream output_nu(filename_nu.str());
-
-	std::stringstream filename_p;
-	filename_p << path << "output_p.csv";
-	std::ofstream output_p(filename_p.str());
 	
+	std::stringstream filename;
+	filename << path << "output.csv";
+	std::ofstream output(filename.str());
 
 	size_t N = static_cast<int>(T / dt);
 	for (size_t index = 0; index < N; ++index) {
 
 		if (index == 0) {
 			single_var_moc_t& prev = buffer.previous();
+			prev.vars.print(t, output);
 		}
 		t += dt;
 
@@ -452,20 +474,355 @@ TEST(MOC_Solver, Task_6)
 
 		moc_solver<1> solver(advection_model, moc_prev_rho, moc_next_rho);
 
-		solver.step_optional_boundaries(dt, rho_in, rho_out);
-		
+		solver.step_optional_boundaries(dt, rho_in, rho_out);	
+
 		moc_layer_wrapper<1> moc_prev_nu(prev.vars.point_double[1],
 			std::get<0>(prev.specific));
 		moc_layer_wrapper<1> moc_next_nu(next.vars.point_double[1],
 			std::get<0>(next.specific));
 
-		solver(advection_model, moc_prev_nu, moc_next_nu);
+		moc_solver<1> solver2(advection_model, moc_prev_nu, moc_next_nu);
 
-		solver.step_optional_boundaries(dt, nu_in, nu_out);
+		solver2.step_optional_boundaries(dt, nu_in, nu_out);
+		next = buffer.current();
+		task.rho_profile = next.vars.point_double[0];
+		task.nu_profile = next.vars.point_double[1];
 
-		p_initial = e_solver.euler_solver_PQ();
+		next.vars.point_double[2] = e_solver.euler_solver_PQ();
+		
+		next.vars.print(t, output);
+
 
 		buffer.advance(+1);
 
 	}
+	output.flush();
+	output.close();
+}
+
+
+// @brief класс, созданный для решения транспортного уравнения
+class simple_moc_solver {
+public:
+	const my_pipe_parameters& pipe;
+	const my_task_parameters& task;
+	simple_moc_solver(const my_pipe_parameters& pipe, const my_task_parameters& task, vector<vector<double>>& layer_prev, vector<vector<double>>& layer_curr) :
+		pipe(pipe), task(task), layer_prev(layer_prev), layer_curr(layer_curr)
+	{
+	}
+
+	double prepare_step(double time_step = std::numeric_limits<double>::quiet_NaN()) {
+		auto& values = layer_prev;
+
+		double eigen_value = calc_speed(task.Q, pipe.internal_diameter);
+	
+		double courant_step = pipe.h / eigen_value;
+		if (std::isnan(time_step) || time_step > courant_step) {
+			time_step = courant_step;
+		}
+		return time_step;
+	}
+
+	/// @brief метод, делающий реальный расчет, в него передаются два граничных условия
+	/// @param left_value левое граничное условие
+	/// @param right_value правое граничное условие
+	void step(double time_step, double dt, vector<vector<double>> left_value, vector<vector<double>> right_value)
+	{
+// не знаю как и куда всунуть расчитанный курант, но тут он всегда 1, поэтому норм
+		double speed = calc_speed(task.Q, pipe.internal_diameter);
+		double dt_ideal = abs(pipe.h / speed);
+		double Cr = speed * dt / pipe.h;
+// основа (для куранта 1)
+		for (size_t num_prof = 0; num_prof < layer_prev.size(); num_prof++)
+		{
+			if (task.Q > 0)
+			{
+				for (int l = 0; l < pipe.n - 1; l++)
+					layer_curr[num_prof][l + 1] = layer_prev[num_prof][l];
+				layer_curr[num_prof][0] = left_value[num_prof][time_step-1];
+			}
+			else
+			{
+				for (int l = pipe.n - 1; l > 0; l--)
+					layer_curr[num_prof][l - 1] = layer_prev[num_prof][l];
+				layer_curr[num_prof][pipe.n] = right_value[num_prof][time_step-1];
+			}
+		}
+
+	}
+	void print_layers(double dt, vector<double>& layer, wstring& filename) {
+		wofstream  fout(filename, ios::app | std::ios::binary | std::ios::trunc);
+		fout << std::to_wstring(dt) << L";";
+		for (int j = 0; j < layer.size(); j++)
+		{
+			fout  << std::to_wstring(layer[j]) << L";";
+		}
+		fout << L"\n";
+		fout.close();
+	}
+private:
+	vector<vector<double>>& layer_prev;
+	vector<vector<double>>& layer_curr;
+};
+
+double linear_interpolator(vector<double> original_time, vector<double> original_value, double new_time_step) 
+{
+	size_t index1 = 0;
+	size_t index2 = 1;
+	while (original_time[index2] < new_time_step) 
+	{
+		++index1;
+		++index2;
+	}
+	double t1 = original_time[index1];
+	double t2 = original_time[index2];
+	double value1 = original_value[index1];
+	double value2 = original_value[index2];
+	return value1 + (value2 - value1) * (new_time_step - t1) / (t2 - t1);
+}
+
+void print_data_to_csv(const vector<double>& time,
+	const vector<double>& rho_and_nu_in_0,
+	const vector<double>& rho_and_nu_in_1,
+	const vector<double>& time_p_in,
+	const vector<double>& time_p_out,
+	const vector<double>& time_Q,
+	const string& filename) {
+
+	// Определяем максимальную длину вектора
+	std::size_t maxLength = std::max({ time.size(), rho_and_nu_in_0.size(), rho_and_nu_in_1.size(),
+									  time_p_in.size(), time_p_out.size(), time_Q.size() });
+
+	// Открываем файл для записи
+	ofstream file(filename);
+
+	// Проверяем, открыт ли файл успешно
+	if (file.is_open()) {
+		// Записываем заголовки столбцов
+		file << "Time; Density; Viscosity; Time Pressure In; Time Pressure Out; Time Flow Rate\n";
+
+		// Определяем размер вектора времени (все векторы должны иметь одинаковый размер)
+		size_t vectorSize = time.size();
+
+		// Записываем данные из векторов
+		for (std::size_t i = 0; i < maxLength; ++i) {
+			// Если индекс находится в пределах длины вектора, записываем значение, иначе записываем пустую ячейку
+			file << (i < time.size() ? std::to_string(time[i]) : "") << ";"
+				<< (i < rho_and_nu_in_0.size() ? std::to_string(rho_and_nu_in_0[i]) : "") << ";"
+				<< (i < rho_and_nu_in_1.size() ? std::to_string(rho_and_nu_in_1[i]) : "") << ";"
+				<< (i < time_p_in.size() ? std::to_string(time_p_in[i]) : "") << ";"
+				<< (i < time_p_out.size() ? std::to_string(time_p_out[i]) : "") << ";"
+				<< (i < time_Q.size() ? std::to_string(time_Q[i]) : "") << "\n";
+		}
+
+		// Закрываем файл
+		file.close();
+		cout << "Запись прошла успешно в файл " << filename << endl;
+	}
+	else {
+		cerr << "Невозможно открыть файл " << filename << endl;
+	}
+}
+TEST(Block_3, Task_2)
+{
+	simple_pipe_properties simple_pipe;
+	simple_pipe.diameter = 0.72;
+	simple_pipe.length = 500;
+	simple_pipe.dx = 10;
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 0.0, speed = 0.5;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	double Q = calc_flow(speed, pipe.internal_diameter);
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {}};
+
+	vector<double> time_row = {0, 60, 120, 180, 240, 300, 360};
+	vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880};
+	vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
+
+	vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880};
+	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
+
+	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6};
+	vector<double> time_Q_row = { Q, 0.20, 0.21, 0.20, 0.18, 0.21, 0.21 };
+
+	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
+	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+	buffer.advance(+1);
+	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
+	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
+
+	vector<double> new_time_row;
+
+	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
+	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
+
+
+	vector<double> new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile;
+
+	simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
+
+
+	double dt = 0;
+	euler_solver_with_MOC e_solver(pipe, task);
+	vector<vector<double>> some_buffer;
+	wstring p_profile_file = L"p_profile.csv";
+	wstring rho_profile_file = L"rho_profile.csv";
+	wstring nu_profile_file = L"nu_profile.csv";
+
+	do {
+		new_time_row.push_back(dt);
+		task.Q = linear_interpolator(time_row, time_Q_row, dt);
+		new_time_Q_row.push_back(task.Q);
+		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
+		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
+
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_out_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_out_row, dt));
+
+		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
+
+		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
+		task.rho_profile = buffer.current()[0];
+		task.nu_profile = buffer.current()[1];
+		task.p_0 = new_time_p_in_row.back();
+		task.Q = new_time_Q_row.back();
+		p_profile = e_solver.euler_solver_PQ();
+		new_time_p_out_row.push_back(p_profile.back());
+		simple_moc.print_layers(dt, p_profile, p_profile_file);
+		simple_moc.print_layers(dt, task.rho_profile, rho_profile_file);
+		simple_moc.print_layers(dt, task.nu_profile, nu_profile_file);
+		//buffer.advance(+1);
+
+		/////////////////////////////
+		some_buffer = buffer.current();
+		buffer.current() = buffer.previous();
+		buffer.previous() = some_buffer;
+		/////////////////////////////
+
+		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
+		//все готово для следующего шага, интерполированная скорость есть
+	} while (dt < time_row.back());
+	
+	string filename_initial = "initial_data.csv";
+	print_data_to_csv(
+		time_row,
+		time_rho_in_row,
+		time_nu_in_row,
+		time_p_in_row,
+		{},
+		time_Q_row,
+		filename_initial
+	);
+	
+	string filename_final = "final_data.csv";
+	print_data_to_csv(
+		new_time_row,
+		rho_and_nu_in[0],
+		rho_and_nu_in[1],
+		new_time_p_in_row,
+		new_time_p_out_row,
+		new_time_Q_row,
+		filename_final
+	);
+}
+
+
+TEST(Block_3, Task_3)
+{
+	simple_pipe_properties simple_pipe;
+	simple_pipe.diameter = 0.72;
+	simple_pipe.length = 500;
+	simple_pipe.dx = 10;
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 5.557e6, Q = 0;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+
+	vector<double> time_row = { 0, 60, 120, 180, 240, 300, 360 };
+	vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880 };
+	vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
+
+	vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880 };
+	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
+
+	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6 };
+	vector<double> time_p_out_row = { p_L, 5.357e6, 5.357e6, 5.458e6, 5.458e6, 5.359e6, 5.359e6 };
+
+//	vector<double> time_Q_row = { Q, 0.20, 0.21, 0.20, 0.18, 0.21, 0.21 };
+
+	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
+	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+	buffer.advance(+1);
+	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
+	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
+	
+	task.rho_profile = buffer.previous()[0];
+	task.nu_profile = buffer.previous()[1];
+	vector<double> new_time_row;
+
+	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
+	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
+
+	vector<double> new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile;
+
+	simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
+
+	double dt = 0;
+	
+	newton_solver_PP_with_euler_with_MOC n_solver(pipe, task);
+	euler_solver_with_MOC e_solver(pipe, task);
+	fixed_solver_parameters_t<1, 0> parameters;
+	// Создание структуры для записи результатов расчета
+	fixed_solver_result_t<1> result;
+
+	vector<vector<double>> some_buffer;
+	size_t counter = 0;
+
+	double Q_approx = 0.19;
+	double dt_debug;
+
+	do {
+		new_time_row.push_back(dt);
+
+		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
+		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
+
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_out_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_out_row, dt));
+
+		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
+		new_time_p_out_row.push_back(linear_interpolator(time_row, time_p_out_row, dt));
+
+		fixed_newton_raphson<1>::solve_dense(n_solver, { Q_approx }, parameters, &result);
+
+		task.Q = result.argument;
+		new_time_Q_row.push_back(task.Q);
+
+		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
+		task.rho_profile = buffer.current()[0];
+		task.nu_profile = buffer.current()[1];
+		task.rho = task.rho_profile[0];
+		task.nu = task.nu_profile[0];
+		task.p_0 = new_time_p_in_row.back();
+		task.p_L = new_time_p_out_row.back();
+		
+		
+
+		p_profile = e_solver.euler_solver_PQ();
+		
+
+		//buffer.advance(+1);
+
+		/////////////////////////////
+		some_buffer = buffer.current();
+		buffer.current() = buffer.previous();
+		buffer.previous() = some_buffer;
+		/////////////////////////////
+		dt_debug = simple_moc.prepare_step();
+		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
+		//все готово для следующего шага, интерполированная скорость есть
+		counter++;
+	} while (dt < time_row.back());
+
+
 }
