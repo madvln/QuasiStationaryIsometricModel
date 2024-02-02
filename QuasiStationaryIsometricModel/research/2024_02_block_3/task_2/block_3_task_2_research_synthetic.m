@@ -1,6 +1,7 @@
 % Загрузка данных из файла CSV
-filename1 = 'C:\Users\Egor\source\repos\QuasiStationaryIsometricModel\QuasiStationaryIsometricModel\final_data.csv';
-filename2 = 'C:\Users\Egor\source\repos\QuasiStationaryIsometricModel\QuasiStationaryIsometricModel\initial_data.csv';
+filename1 = 'research_out/final_data.csv';
+filename2 = 'research_out/initial_data.csv';
+
 data1 = readtable(filename1);
 data2 = readtable(filename2);
 
@@ -29,6 +30,15 @@ legend('Интерполированные данные','Начальные к�
 
 % Построение третьего графика
 subplot(5, 1, 3);
+plot(data1.Time, data1.TimeFlowRate, Color='b');
+hold on;
+plot(data2.Time, data2.TimeFlowRate, Marker="*", Color='r', LineStyle='none');
+title('График 5: Временной ряд расхода');
+xlabel('Время');
+ylabel('Расход');
+legend('Интерполированные данные','Начальные краевые условия')
+% Построение четвертого графика
+subplot(5, 1, 4);
 plot(data1.Time, data1.TimePressureIn, Color='b');
 hold on;
 plot(data2.Time, data2.TimePressureIn, Marker="*", Color='r', LineStyle='none');
@@ -37,26 +47,17 @@ xlabel('Время');
 ylabel('Давление на входе');
 legend('Интерполированные данные','Начальные краевые условия')
 
-% Построение четвертого графика
-subplot(5, 1, 4);
+% Построение пятого графика
+subplot(5, 1, 5);
 plot(data1.Time, data1.TimePressureOut, Color='b');
 hold on;
 plot(data2.Time, data2.TimePressureOut, Marker="*", Color='r', LineStyle='none');
 title('График 4: Временной ряд давления на выходе');
 xlabel('Время');
 ylabel('Давление на выходе');
+newXLimit = [0, 400];
+xlim(newXLimit);
 legend('Интерполированные данные','Начальные краевые условия')
-
-% Построение пятого графика
-subplot(5, 1, 5);
-plot(data1.Time, data1.TimeFlowRate, Color='b');
-hold on;
-plot(data2.Time, data2.TimeFlowRate, Marker="*", Color='r', LineStyle='none');
-title('График 5: Временной ряд расхода');
-xlabel('Время');
-ylabel('Расход');
-legend('Интерполированные данные','Начальные краевые условия')
-
 
 
 % Регулировка размера окна
