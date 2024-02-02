@@ -969,7 +969,7 @@ TEST(Block_3, Task_2_One_Parameter)
 }
 
 
-TEST(Block_3, Task_3_One_Parameter)
+TEST(Block_3, Task_3_Two_Parameters)
 {
 	simple_pipe_properties simple_pipe;
 	simple_pipe.diameter = 0.72;
