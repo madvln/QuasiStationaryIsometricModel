@@ -683,9 +683,9 @@ TEST(Block_3, Task_2)
 	wstring folder_path = L"research\\block_3\\task_2";
 
 
-	wstring p_profile_file = L"p_profile.csv";
-	wstring rho_profile_file = L"rho_profile.csv";
-	wstring nu_profile_file = L"nu_profile.csv";
+	wstring p_profile_file = folder_path + L"\\p_profile.csv";
+	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
+	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
 
 	do {
 		new_time_row.push_back(dt);
