@@ -683,8 +683,6 @@ TEST(Block_3, Task_2)
 	euler_solver_with_MOC e_solver(pipe, task);
 
 	wstring folder_path = L"research\\block_3\\task_2";
-
-
 	wstring p_profile_file = folder_path + L"\\p_profile.csv";
 	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
 	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
@@ -778,21 +776,19 @@ TEST(Block_3, Task_3)
 	double dt = 0;
 	
 	newton_solver_PP_with_euler_with_MOC n_solver(pipe, task);
-
 	fixed_solver_parameters_t<1, 0> parameters;
 	// Создание структуры для записи результатов расчета
 	fixed_solver_result_t<1> result;
 
-
 	double Q_approx = 0.19;
-	double dt_debug;
-
+	wstring folder_path = L"research\\block_3\\task_2";
+	wstring p_profile_file = folder_path + L"\\p_profile.csv";
+	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
+	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
 	do {
 		new_time_row.push_back(dt);
-
 		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
 		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
-
 		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_out_row, dt));
 		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_out_row, dt));
 
@@ -800,26 +796,39 @@ TEST(Block_3, Task_3)
 		new_time_p_out_row.push_back(linear_interpolator(time_row, time_p_out_row, dt));
 
 		fixed_newton_raphson<1>::solve_dense(n_solver, { Q_approx }, parameters, &result);
-
 		task.Q = result.argument;
 		new_time_Q_row.push_back(task.Q);
-
-		simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
-		
+		simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());		
 		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
 		task.rho_profile = buffer.current()[0];
 		task.nu_profile = buffer.current()[1];
 		task.rho = task.rho_profile[0];
 		task.nu = task.nu_profile[0];
 		task.p_0 = new_time_p_in_row.back();
-		task.p_L = new_time_p_out_row.back();
-		
-		p_profile = n_solver.get_p_profile();
-		
+		task.p_L = new_time_p_out_row.back();		
+		p_profile = n_solver.get_p_profile();		
 		buffer.advance(+1);
-
-		dt_debug = simple_moc.prepare_step();
 		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
 		//все готово для следующего шага, интерполированная скорость есть
 	} while (dt < time_row.back());
+	wstring filename_initial = folder_path + L"\\initial_data.csv";
+	print_data_to_csv(
+		time_row,
+		time_rho_in_row,
+		time_nu_in_row,
+		time_p_in_row,
+		time_p_out_row,
+		{},
+		filename_initial
+	);
+	wstring filename_final = folder_path + L"\\final_data.csv";
+	print_data_to_csv(
+		new_time_row,
+		rho_and_nu_in[0],
+		rho_and_nu_in[1],
+		new_time_p_in_row,
+		new_time_p_out_row,
+		new_time_Q_row,
+		filename_final
+	);
 }
