@@ -7,8 +7,8 @@ data = readtable(filename);
 
 data = dlmread(filename, ';', 0, 0);
 km = 0:0.1:100;
-minValue = min(data, [], 'all')-100;
-maxValue = 100;
+minValue = -100;
+maxValue = 1100;
 
 filename2 = 'research_out/p_profile.csv';
 data2 = readtable(filename2);
@@ -26,7 +26,7 @@ maxValue3 = max(data3(:, 2:end-1), [], 'all')+10;
 % Отображение данных перед началом цикла
 figure;
 subplot(3, 1, 1);
-plot(km, data(1, 2:end-1), '-o', 'Color', 'b');
+plot(km, -data(1, 2:end-1), '-o', 'Color', 'b');
 hold on;
 xlabel('Труба, км');
 ylabel('Разница давлений, Па');
@@ -65,9 +65,9 @@ im(1, 1, 1, size(data, 1)) = 0;
 for i = 2:size(data(:,1))
     % Отображение данных
     subplot(3, 1, 1);
-    plot(km, data(i, 2:end-1), '-o', 'Color', 'r');
+    plot(km, -data(i, 2:end-1), '-o', 'Color', 'r');
     hold on;
-    plot(km, data(1, 2:end-1), '-o', 'Color', 'b');
+    plot(km, -data(1, 2:end-1), '-o', 'Color', 'b');
     newXLimit = [0, 100];
     xlim(newXLimit);
     newYLimit = [minValue, maxValue];

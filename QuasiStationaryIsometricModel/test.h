@@ -1,5 +1,5 @@
 #pragma once
-const double g = 9.81, pi = 3.14;
+const double g = 9.81, pi = M_PI;
 using namespace std;
 
 struct my_pipe_parameters
@@ -120,7 +120,7 @@ public:
 	{
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		double p_0 = task.p_L + (pipe.z_L - pipe.z_0) * task.rho * g +
 			(hydraulic_resistance * pipe.length * pow(speed, 2) * task.rho) / (2 * task.pipe.internal_diameter);
 		return p_0;
@@ -131,7 +131,7 @@ public:
 	{
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		double p_L = task.p_0 - (pipe.z_L - pipe.z_0) * task.rho * g -
 			(hydraulic_resistance * pipe.length * pow(speed, 2) * task.rho) / (2 * task.pipe.internal_diameter);
 		return p_L;
@@ -147,7 +147,7 @@ public:
 			hydraulic_resistance_prev = hydraulic_resistance;
 			speed = sqrt(hydraulic_resistance_v2 / hydraulic_resistance_prev);
 			Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-			hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+			hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		} while (abs(hydraulic_resistance - hydraulic_resistance_prev) > 0.0002);
 		double Q = pi * pow(pipe.internal_diameter, 2) * speed / 4;
 		return Q;
@@ -170,7 +170,7 @@ public:
 		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		double tau = calc_tau(hydraulic_resistance, task.rho, speed);
 		vector<double> p_profile = vector<double>(pipe.n);
 		p_profile[0] = task.p_0;
@@ -185,7 +185,7 @@ public:
 		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		double tau = calc_tau(hydraulic_resistance, task.rho, speed);
 		vector<double> p_profile = vector<double>(pipe.n);
 		p_profile[pipe.n - 1] = task.p_L;
@@ -212,7 +212,7 @@ public:
 	{
 		double speed = x;
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		return (hydraulic_resistance * (pipe.length * pow(speed, 2) / (pipe.internal_diameter * 2 * g)) + task.p_L / (task.rho * g) + pipe.z_L - task.p_0 / (task.rho * g) - pipe.z_0);
 	}
 };
@@ -260,7 +260,7 @@ public:
 		for (int i = 1; i < pipe.n; i++)
 		{
 			double Re = calc_Re(speed, pipe.internal_diameter, task.nu_profile[i]);
-			double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+			double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 			double tau = calc_tau(hydraulic_resistance, task.rho_profile[i], speed);
 			p_profile[i] = p_profile[i - 1] + pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho_profile[i] * g * (delta_z / pipe.h));
 
@@ -278,7 +278,7 @@ public:
 		for (int i = pipe.n - 2; i >= 0; i--)
 		{
 			double Re = calc_Re(speed, pipe.internal_diameter, task.nu_profile[i]);
-			double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+			double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 			double tau = calc_tau(hydraulic_resistance, task.rho_profile[i], speed);
 			p_profile[i] = p_profile[i + 1] - pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho_profile[i] * g * (delta_z / pipe.h));
 
