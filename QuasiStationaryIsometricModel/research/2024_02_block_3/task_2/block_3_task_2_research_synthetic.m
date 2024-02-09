@@ -10,54 +10,59 @@ figure;
 
 % Построение первого графика
 subplot(5, 1, 1);
-plot(data1.Time, data1.Density, Color='b');
+plot(data2.Time, data2.Density, Color='0 0 0', LineWidth=2, Marker='.',MarkerSize=20);
 hold on;
-plot(data2.Time, data2.Density, Marker="*", Color='r', LineStyle='none');
+plot(data1.Time, data1.Density, Marker=".", Color='1 0.549 0', LineStyle='none', MarkerSize=20);
+ylim([810, 960]);
 title('График 1: Временной ряд плотности');
 xlabel('Время');
 ylabel('Плотность');
-legend('Интерполированные данные','Начальные краевые условия')
+legend('Интерполированные данные','Исходные краевые условия')
 
 % Построение второго графика
 subplot(5, 1, 2);
-plot(data1.Time, data1.Viscosity, Color='b');
+plot(data2.Time, data2.Viscosity, Color='0 0 0', LineWidth=2, Marker='.',MarkerSize=20);
 hold on;
-plot(data2.Time, data2.Viscosity, Marker="*", Color='r', LineStyle='none');
+plot(data1.Time, data1.Viscosity, Marker=".", Color='1 0.549 0', LineStyle='none', MarkerSize=20);
+ylim([0.6e-5, 2.1e-5]);
 title('График 2: Временной ряд вязкости');
 xlabel('Время');
 ylabel('Вязкость');
-legend('Интерполированные данные','Начальные краевые условия')
+legend('Интерполированные данные','Исходные краевые условия')
 
 % Построение третьего графика
 subplot(5, 1, 3);
-plot(data1.Time, data1.TimeFlowRate, Color='b');
+plot(data2.Time, data2.TimeFlowRate, Color='0 0 0', LineWidth=2, Marker='.',MarkerSize=20);
 hold on;
-plot(data2.Time, data2.TimeFlowRate, Marker="*", Color='r', LineStyle='none');
+plot(data1.Time, data1.TimeFlowRate, Marker=".", Color='1 0.549 0', LineStyle='none', MarkerSize=20);
+ylim([0, 0.4]);
 title('График 3: Временной ряд расхода');
 xlabel('Время');
 ylabel('Расход');
-legend('Интерполированные данные','Начальные краевые условия')
+legend('Интерполированные данные','Исходные краевые условия')
+
 % Построение четвертого графика
 subplot(5, 1, 4);
-plot(data1.Time, data1.TimePressureIn, Color='b');
+plot(data2.Time, data2.TimePressureIn, Color='0 0 0', LineWidth=2, Marker='.',MarkerSize=20);
 hold on;
-plot(data2.Time, data2.TimePressureIn, Marker="*", Color='r', LineStyle='none');
+plot(data1.Time, data1.TimePressureIn, Marker=".", Color='1 0.549 0', LineStyle='none', MarkerSize=20);
+ylim([5.8e6, 6.2e6]);
 title('График 4: Временной ряд давления на входе');
 xlabel('Время');
 ylabel('Давление на входе');
-legend('Интерполированные данные','Начальные краевые условия')
+newXLimit = [0, 400];
+legend('Интерполированные данные','Исходные краевые условия')
 
 % Построение пятого графика
 subplot(5, 1, 5);
-plot(data1.Time, data1.TimePressureOut, Color='b');
-hold on;
-plot(data2.Time, data2.TimePressureOut, Marker="*", Color='r', LineStyle='none');
+plot(data1.Time, data1.TimePressureOut, Marker=".", Color='1 0.549 0', LineStyle='none', MarkerSize=20);
+ylim([5.3e6, 5.7e6]);
 title('График 5: Временной ряд давления на выходе');
 xlabel('Время');
 ylabel('Давление на выходе');
 newXLimit = [0, 400];
 xlim(newXLimit);
-legend('Интерполированные данные','Начальные краевые условия')
+legend('Интерполированные данные')
 
 
 % Регулировка размера окна

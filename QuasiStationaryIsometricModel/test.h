@@ -774,15 +774,43 @@ TEST(Block_3, Task_3)
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
 	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
 
-	vector<double> time_row = { 0, 60, 120, 180, 240, 300, 360 };
-	vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880 };
-	vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
+	//vector<double> time_row = { 0, 60, 120, 180, 240, 300, 360 };
+	//vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880 };
+	//vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
 
-	vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880 };
-	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
+	//vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880 };
+	//vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
 
-	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6 };
-	vector<double> time_p_out_row = { p_L, 5.357e6, 5.357e6, 5.458e6, 5.458e6, 5.359e6, 5.359e6 };
+	//vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6 };
+	//vector<double> time_p_out_row = { p_L, 5.357e6, 5.357e6, 5.458e6, 5.458e6, 5.359e6, 5.359e6 };
+
+	std::srand(std::time(nullptr));
+	vector<double> time_row;
+	for (double time = 0.0; time <= 360.0; time += 10.0)
+		time_row.push_back(time);
+	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_rho_in_row[i] = rho - abs(rho * 0.005 * std::rand() / RAND_MAX);
+	}
+	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_nu_in_row[i] = nu - abs(nu * 0.002 * std::rand() / RAND_MAX);
+	}
+	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
+	vector<double> time_nu_out_row = vector<double>(time_row.size(), nu);
+	vector<double> time_p_in_row = vector<double>(time_row.size(), p_0);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_p_in_row[i] = p_0 - abs(p_0 * 2e-4 * std::rand() / RAND_MAX);
+	}
+
+	vector<double> time_p_out_row = vector<double>(time_row.size(), p_L);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_p_out_row[i] = p_L - abs(p_L * 2e-4 * std::rand() / RAND_MAX);
+	}
 
 	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
 	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
@@ -874,15 +902,17 @@ TEST(Block_3, Task_2_One_Parameter)
 	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
 	
 	vector<double> time_row;
-	for (double time = 0.0; time <= 200000.0; time += 100.0) 
+	for (double time = 0.0; time <= 250000.0; time += 100.0) 
 		time_row.push_back(time);
 	
 	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
 	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);
-	std::srand(std::time(nullptr));
-	for (size_t i = 10; i <= 2000; i++)
+	//std::srand(std::time(nullptr));
+	for (size_t i = 100; i <= time_row.size() - 1/*200*/; i++)
 	{
-		time_nu_in_row[i] = nu  + nu * 0.2 * std::rand() / RAND_MAX;
+		//time_rho_in_row[i] = 880;
+		time_nu_in_row[i] = 13e-6;
+		//time_nu_in_row[i] = nu  + nu * 0.2 * std::rand() / RAND_MAX;
 	}
 	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
 	vector<double> time_nu_out_row = vector<double>(time_row.size(), nu);
@@ -937,7 +967,7 @@ TEST(Block_3, Task_2_One_Parameter)
 			initial_p_profile = p_profile;
 		new_time_p_out_row.push_back(p_profile.back());
 		std::transform(initial_p_profile.begin(), initial_p_profile.end(), p_profile.begin(), diff_p_profile.begin(),
-			[](double initial, double current) {return initial - current;  });
+			[](double initial, double current) {return current - initial;  });
 		print_layers(dt, p_profile, p_profile_file);
 		print_layers(dt, buffer.current()[0], rho_profile_file);
 		print_layers(dt, buffer.current()[1], nu_profile_file);
@@ -969,41 +999,27 @@ TEST(Block_3, Task_2_One_Parameter)
 }
 
 
-TEST(Block_3, Task_3_Two_Parameters)
+TEST(Block_3, Task_3_One_Parameter)
 {
 	simple_pipe_properties simple_pipe;
 	simple_pipe.diameter = 0.72;
 	simple_pipe.length = 100e3;
 	simple_pipe.dx = 100;
 	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
-		rho = 870, nu = 15e-6, p_0 = 6e6, p_L = 5.16e6, Q = 0;
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 5.16e6, Q = 0;
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
 	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
 	vector<double> time_row;
-	for (double time = 0.0; time <= 200000.0; time += 100.0)
+	for (double time = 0.0; time <= 250000.0; time += 100.0)
 		time_row.push_back(time);
 	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
 	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);
-	std::srand(std::time(nullptr));
-	for (size_t i = 10; i <= 500; i++)
-	{
-		time_rho_in_row[i] = 865;
-	}
-
-	for (size_t i = 501; i <= 1000; i++)
-	{
-		time_rho_in_row[i] = 860;
-	}
-
-	for (size_t i = 10; i <= 500; i++)
-	{
-		time_nu_in_row[i] = 14e-6;
-	}
-
-	for (size_t i = 501; i <= 2000; i++)
+	//std::srand(std::time(nullptr));
+	for (size_t i = 100; i <= time_row.size()-1/*200*/; i++)
 	{
 		time_nu_in_row[i] = 13e-6;
 	}
+
 	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
 	vector<double> time_nu_out_row = vector<double>(time_row.size(), nu);
 	vector<double> time_p_in_row = vector<double>(time_row.size(), p_0);
@@ -1033,7 +1049,7 @@ TEST(Block_3, Task_3_Two_Parameters)
 	fixed_solver_result_t<1> result;
 
 	double Q_approx = 0.19;
-	wstring folder_path = L"research\\2024_02_block_3\\task_3_change_rho_and_nu\\research_out";
+	wstring folder_path = L"research\\2024_02_block_3\\task_3_change_nu\\research_out";
 	wstring p_profile_file = folder_path + L"\\p_profile.csv";
 	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
 	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
@@ -1063,7 +1079,7 @@ TEST(Block_3, Task_3_Two_Parameters)
 		if (dt == 0)
 			initial_p_profile = p_profile;
 		std::transform(initial_p_profile.begin(), initial_p_profile.end(), p_profile.begin(), diff_p_profile.begin(),
-			[](double initial, double current) {return initial - current;  });
+			[](double initial, double current) {return current - initial;  });
 		print_layers(dt, p_profile, p_profile_file);
 		print_layers(dt, buffer.current()[0], rho_profile_file);
 		print_layers(dt, buffer.current()[1], nu_profile_file);
