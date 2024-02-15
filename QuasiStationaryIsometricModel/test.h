@@ -908,10 +908,10 @@ TEST(Block_3, Task_2_One_Parameter)
 	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
 	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);
 	//std::srand(std::time(nullptr));
-	for (size_t i = 100; i <= time_row.size() - 1/*200*/; i++)
+	for (size_t i = 100; i <= /*time_row.size() - 1*/200; i++)
 	{
-		//time_rho_in_row[i] = 880;
-		time_nu_in_row[i] = 13e-6;
+		time_rho_in_row[i] = 880;
+		//time_nu_in_row[i] = 13e-6;
 		//time_nu_in_row[i] = nu  + nu * 0.2 * std::rand() / RAND_MAX;
 	}
 	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
@@ -937,7 +937,7 @@ TEST(Block_3, Task_2_One_Parameter)
 
 	euler_solver_with_MOC e_solver(pipe, task);
 
-	wstring folder_path = L"research\\2024_02_block_3\\task_2_change_nu\\research_out";
+	wstring folder_path = L"research\\2024_02_block_3\\task_2_change_rho\\research_out";
 	wstring p_profile_file = folder_path + L"\\p_profile.csv";
 	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
 	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
@@ -1015,9 +1015,10 @@ TEST(Block_3, Task_3_One_Parameter)
 	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
 	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);
 	//std::srand(std::time(nullptr));
-	for (size_t i = 100; i <= time_row.size()-1/*200*/; i++)
+	for (size_t i = 100; i <= time_row.size()-1/*200*/ ; i++)
 	{
-		time_nu_in_row[i] = 13e-6;
+		//time_nu_in_row[i] = 13e-6;
+		time_rho_in_row[i] = 880;
 	}
 
 	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
@@ -1048,8 +1049,8 @@ TEST(Block_3, Task_3_One_Parameter)
 	// Создание структуры для записи результатов расчета
 	fixed_solver_result_t<1> result;
 
-	double Q_approx = 0.19;
-	wstring folder_path = L"research\\2024_02_block_3\\task_3_change_nu\\research_out";
+	double Q_approx = 0.195;
+	wstring folder_path = L"research\\2024_02_block_3\\task_3_change_rho\\research_out";
 	wstring p_profile_file = folder_path + L"\\p_profile.csv";
 	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
 	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";

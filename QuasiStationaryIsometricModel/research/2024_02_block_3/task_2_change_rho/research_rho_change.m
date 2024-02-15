@@ -60,16 +60,18 @@ function plotData(data, data2, data3, km, minValue, maxValue, minValue2, maxValu
     
     % Четвертый подграфик
     subplot(4, 1, 4);
-    plot(data2(1:end, 1), data2(1:end, end-1), 'Color', 'b', LineWidth=2);
+    t = data2(1:end, 1);
+    t = t/3600;
+    plot(t, data2(1:end, end-1), 'Color', 'b', LineWidth=2);
     hold on;
-    plot(data2(1,1), data2(1, end-1), "Marker",".","LineStyle","none",MarkerSize=20, Color='r');
+    plot(t(1), data2(1, end-1), "Marker",".","LineStyle","none",MarkerSize=20, Color='r');
     hold on;
-    text(data2(1,1), data2(1, end-1), ['t = ' num2str(data2(1,1)) ', с'], 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
+    text(t(1), data2(1, end-1), ['t = ' num2str(data2(1,1)) ', с'], 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
     hold off;
-    xlabel('Время, с');
+    xlabel('Время, ч');
     ylabel('Давление, Па');
     title(['Времяной ряд давления на выходе']);
-    xlim([0, 250000]);
+    xlim([0, 69]);
     ylim([minValue4,maxValue4]);
     figure_size = [0, 0, 1920, 1080];
     set(gcf, 'Position', figure_size);
@@ -115,16 +117,18 @@ function createGif(data, data2, data3, km, minValue, maxValue, minValue2, maxVal
         ylim([minValue3, maxValue3]);
         
         subplot(4, 1, 4);
-        plot(data2(1:end, 1), data2(1:end, end-1), 'Color', 'b', LineWidth=2);
+        t = data2(1:end, 1);
+        t = t/3600;
+        plot(t, data2(1:end, end-1), 'Color', 'b', LineWidth=2);
         hold on
-        plot(data2(i,1), data2(i, end-1), "Marker",".","LineStyle","none",MarkerSize=20, Color='r')
+        plot(t(i), data2(i, end-1), "Marker",".","LineStyle","none",MarkerSize=20, Color='r')
         hold on;
-        text(data2(i,1), data2(i, end-1), ['t = ' num2str(data2(i,1)) ', с'], 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
+        text(t(i), data2(i, end-1), ['t = ' num2str(data2(i,1)) ', с'], 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
         hold off;
-        xlabel('Время, с');
+        xlabel('Время, ч');
         ylabel('Давление, Па');
         title(['Времяной ряд давления на выходе']);
-        xlim([0, 250000]);
+        xlim([0, 69]);
         ylim([minValue4,maxValue4]);
         figure_size = [0, 0, 1920, 1080];
         set(gcf, 'Position', figure_size);
@@ -135,8 +139,8 @@ function createGif(data, data2, data3, km, minValue, maxValue, minValue2, maxVal
     end
 
     % Сохранение гифки в файл
-    %filename = 'импульс_плотности.gif';
-    filename = 'скачек_плотности.gif';
+    filename = 'импульс_плотности.gif';
+    %filename = 'скачек_плотности.gif';
     imwrite(im, map, filename, 'DelayTime', 0.02, 'LoopCount', inf);
     disp(['Гифка сохранена в файл: ' filename]);
 end

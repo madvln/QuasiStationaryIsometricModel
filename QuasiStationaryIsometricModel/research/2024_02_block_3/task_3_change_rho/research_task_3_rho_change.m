@@ -15,8 +15,8 @@ function main()
     maxValue2 = max(data2(:, 2:end-1), [], 'all')+0.1e6;
     minValue3 = min(data3(:, 2:end-1), [], 'all')-10;
     maxValue3 = max(data3(:, 2:end-1), [], 'all')+10;
-    minValue4 = 0.1889;
-    maxValue4 = 0.1893;
+    minValue4 = 0.1880;%0.1889;
+    maxValue4 = 0.1950;%0.1893;
     % Отображение данных перед началом цикла
     plotData(data, data2, data3, data4, km, minValue, maxValue, minValue2, maxValue2, minValue3, maxValue3, minValue4, maxValue4);
     
@@ -61,16 +61,18 @@ function plotData(data, data2, data3, data4, km, minValue, maxValue, minValue2, 
     
     % Четвертый подграфик
     subplot(4, 1, 4);
-    plot(data4.Time, data4.TimeFlowRate, 'Color', 'b', LineWidth=2);
+    t = data4.Time;
+    t = t/3600;
+    plot(t, data4.TimeFlowRate, 'Color', 'b', LineWidth=2);
     hold on;
-    plot(data4.Time(1), data4.TimeFlowRate(1), "Marker",".","LineStyle","none",MarkerSize=20, Color='r');
+    plot(t(1), data4.TimeFlowRate(1), "Marker",".","LineStyle","none",MarkerSize=20, Color='r');
     hold on;
-    text(data4.Time(1), data4.TimeFlowRate(1), ['t = ' num2str(data4.Time(1)) ', с'], 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
+    text(t(1), data4.TimeFlowRate(1), ['t = ' num2str(data4.Time(1)) ', с'], 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
     hold off;
-    xlabel('Время, с');
+    xlabel('Время, ч');
     ylabel('Расход, м^3/с');
     title(['Времяной ряд расхода']);
-    xlim([0, 250000]);
+    xlim([0, 69]);
     ylim([minValue4,maxValue4]);
     figure_size = [0, 0, 1920, 1080];
     set(gcf, 'Position', figure_size);
@@ -116,16 +118,18 @@ function createGif(data, data2, data3, data4, km, minValue, maxValue, minValue2,
         ylim([minValue3, maxValue3]);
        
         subplot(4, 1, 4);
-        plot(data4.Time, data4.TimeFlowRate, 'Color', 'b', LineWidth=2);
+        t = data4.Time;
+        t = t/3600;
+        plot(t, data4.TimeFlowRate, 'Color', 'b', LineWidth=2);
         hold on;
-        plot(data4.Time(i), data4.TimeFlowRate(i), "Marker",".","LineStyle","none",MarkerSize=20, Color='r');
+        plot(t(i), data4.TimeFlowRate(i), "Marker",".","LineStyle","none",MarkerSize=20, Color='r');
         hold on;
-        text(data4.Time(i), data4.TimeFlowRate(i), ['t = ' num2str(data4.Time(i)) ', с'], 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
+        text(t(i), data4.TimeFlowRate(i), ['t = ' num2str(data4.Time(i)) ', с'], 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
         hold off;
-        xlabel('Время, с');
+        xlabel('Время, ч');
         ylabel('Расход, м^3/с');
         title(['Времяной ряд расхода']);
-        xlim([0, 250000]);
+        xlim([0, 69]);
         ylim([minValue4,maxValue4]);
         figure_size = [0, 0, 1920, 1080];
         set(gcf, 'Position', figure_size);
@@ -136,8 +140,8 @@ function createGif(data, data2, data3, data4, km, minValue, maxValue, minValue2,
     end
 
     % Сохранение гифки в файл
-    filename = 'импульс_плотности.gif';
-    %filename = 'скачек_плотности.gif';
+    %filename = 'импульс_плотности.gif';
+    filename = 'скачек_плотности.gif';
     imwrite(im, map, filename, 'DelayTime', 0.02, 'LoopCount', inf);
     disp(['Гифка сохранена в файл: ' filename]);
 end
