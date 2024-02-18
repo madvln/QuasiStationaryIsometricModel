@@ -53,7 +53,7 @@ function plotData(data, data2, data3, km, minValue, maxValue, minValue2, maxValu
     subplot(4, 1, 3);
     plot(km, data3(1, 2:end-1), 'Color', 'b', LineWidth=2);
     xlabel('Труба, км');
-    ylabel('Вязкость, сСт');
+    ylabel('Вязкость, Ст');
     title('Профиль вязкости');
     xlim([0, 100]);
     ylim([minValue3, maxValue3]);
@@ -111,7 +111,7 @@ function createGif(data, data2, data3, km, minValue, maxValue, minValue2, maxVal
         subplot(4, 1, 3);
         plot(km, data3(i, 2:end-1), 'Color', 'b', LineWidth=2);
         xlabel('Труба, км');
-        ylabel('Вязкость, сСт');
+        ylabel('Вязкость, Ст');
         title('Профиль вязкости');
         xlim([0, 100]);
         ylim([minValue3, maxValue3]);
@@ -139,8 +139,8 @@ function createGif(data, data2, data3, km, minValue, maxValue, minValue2, maxVal
     end
 
     % Сохранение гифки в файл
-    filename = 'импульс_вязкости.gif';
-    %filename = 'скачек_вязкости.gif';
+    %filename = 'импульс_вязкости.gif';
+    filename = 'скачек_вязкости.gif';
     imwrite(im, map, filename, 'DelayTime', 0.02, 'LoopCount', inf);
     disp(['Гифка сохранена в файл: ' filename]);
 end
