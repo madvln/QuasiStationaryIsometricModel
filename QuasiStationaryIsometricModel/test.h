@@ -971,6 +971,10 @@ TEST(Block_3, Task_2_One_Parameter)
 
 	euler_solver_with_MOC e_solver(pipe, task);
 
+	string path = string("../QuasiStationaryIsometricModel/research/2024_02_block_3/task_2_change_rho_and_Q/research_out/");
+
+	filesystem::create_directories(path);
+
 	wstring folder_path = L"research\\2024_02_block_3\\task_2_change_rho_and_Q\\research_out";
 	wstring p_profile_file = folder_path + L"\\p_profile.csv";
 	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
