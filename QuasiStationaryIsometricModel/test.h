@@ -1,5 +1,6 @@
 #pragma once
-const double g = 9.81, pi = 3.14;
+#include <random>
+const double g = 9.81, pi = M_PI;
 using namespace std;
 
 struct my_pipe_parameters
@@ -120,7 +121,7 @@ public:
 	{
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		double p_0 = task.p_L + (pipe.z_L - pipe.z_0) * task.rho * g +
 			(hydraulic_resistance * pipe.length * pow(speed, 2) * task.rho) / (2 * task.pipe.internal_diameter);
 		return p_0;
@@ -131,7 +132,7 @@ public:
 	{
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		double p_L = task.p_0 - (pipe.z_L - pipe.z_0) * task.rho * g -
 			(hydraulic_resistance * pipe.length * pow(speed, 2) * task.rho) / (2 * task.pipe.internal_diameter);
 		return p_L;
@@ -147,7 +148,7 @@ public:
 			hydraulic_resistance_prev = hydraulic_resistance;
 			speed = sqrt(hydraulic_resistance_v2 / hydraulic_resistance_prev);
 			Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-			hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+			hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		} while (abs(hydraulic_resistance - hydraulic_resistance_prev) > 0.0002);
 		double Q = pi * pow(pipe.internal_diameter, 2) * speed / 4;
 		return Q;
@@ -170,7 +171,7 @@ public:
 		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		double tau = calc_tau(hydraulic_resistance, task.rho, speed);
 		vector<double> p_profile = vector<double>(pipe.n);
 		p_profile[0] = task.p_0;
@@ -185,7 +186,7 @@ public:
 		double delta_z = (pipe.z_L - pipe.z_0) / (pipe.n - 1);
 		double speed = calc_speed(task.Q, pipe.internal_diameter);
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		double tau = calc_tau(hydraulic_resistance, task.rho, speed);
 		vector<double> p_profile = vector<double>(pipe.n);
 		p_profile[pipe.n - 1] = task.p_L;
@@ -212,7 +213,7 @@ public:
 	{
 		double speed = x;
 		double Re = calc_Re(speed, pipe.internal_diameter, task.nu);
-		double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+		double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 		return (hydraulic_resistance * (pipe.length * pow(speed, 2) / (pipe.internal_diameter * 2 * g)) + task.p_L / (task.rho * g) + pipe.z_L - task.p_0 / (task.rho * g) - pipe.z_0);
 	}
 };
@@ -260,7 +261,7 @@ public:
 		for (int i = 1; i < pipe.n; i++)
 		{
 			double Re = calc_Re(speed, pipe.internal_diameter, task.nu_profile[i]);
-			double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+			double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 			double tau = calc_tau(hydraulic_resistance, task.rho_profile[i], speed);
 			p_profile[i] = p_profile[i - 1] + pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho_profile[i] * g * (delta_z / pipe.h));
 
@@ -278,7 +279,7 @@ public:
 		for (int i = pipe.n - 2; i >= 0; i--)
 		{
 			double Re = calc_Re(speed, pipe.internal_diameter, task.nu_profile[i]);
-			double hydraulic_resistance = hydraulic_resistance_isaev(Re, pipe.roughness);
+			double hydraulic_resistance = hydraulic_resistance_altshul(Re, pipe.roughness);
 			double tau = calc_tau(hydraulic_resistance, task.rho_profile[i], speed);
 			p_profile[i] = p_profile[i + 1] - pipe.h * ((-4 / pipe.internal_diameter) * tau - task.rho_profile[i] * g * (delta_z / pipe.h));
 
@@ -306,9 +307,14 @@ public:
 		temp_task.Q = x; // во временной структуре используем Q для нашего уравнения невязки, эта Q будет идти в солвер
 		euler_solver_with_MOC e_solver(pipe, temp_task); // Объявляем переменную класса солвера Эйлером
 
-		vector<double> p_profile = e_solver.euler_solver_PQ(); // Считаем профиль давлений Эйлером
+		p_profile = e_solver.euler_solver_PQ(); // Считаем профиль давлений Эйлером
 		return (p_profile.back() - task.p_L);
 	}
+	vector<double> get_p_profile() const {
+		return p_profile;
+	}
+private:
+	vector<double> p_profile;
 };
 
 /// @brief Решение задачи PQ методом простых итераций
@@ -550,16 +556,6 @@ public:
 		}
 
 	}
-	void print_layers(double dt, vector<double>& layer, wstring& filename) {
-		wofstream  fout(filename, ios::app | std::ios::binary | std::ios::trunc);
-		fout << std::to_wstring(dt) << L";";
-		for (int j = 0; j < layer.size(); j++)
-		{
-			fout  << std::to_wstring(layer[j]) << L";";
-		}
-		fout << L"\n";
-		fout.close();
-	}
 private:
 	vector<vector<double>>& layer_prev;
 	vector<vector<double>>& layer_curr;
@@ -581,17 +577,22 @@ double linear_interpolator(vector<double> original_time, vector<double> original
 	return value1 + (value2 - value1) * (new_time_step - t1) / (t2 - t1);
 }
 
-void print_data_to_csv(const vector<double>& time,
+void print_data_to_csv(const vector<double>& time_rho,
 	const vector<double>& rho_and_nu_in_0,
+	const vector<double>& time_nu,
 	const vector<double>& rho_and_nu_in_1,
 	const vector<double>& time_p_in,
+	const vector<double>& p_in,
 	const vector<double>& time_p_out,
+	const vector<double>& p_out,
 	const vector<double>& time_Q,
-	const string& filename) {
+	const vector<double>& Q,
+	const wstring& filename)
+{
 
 	// Определяем максимальную длину вектора
-	std::size_t maxLength = std::max({ time.size(), rho_and_nu_in_0.size(), rho_and_nu_in_1.size(),
-									  time_p_in.size(), time_p_out.size(), time_Q.size() });
+	size_t maxLength = max({ time_rho.size(), rho_and_nu_in_0.size(), time_nu.size(), rho_and_nu_in_1.size(),
+									  time_p_in.size(), p_in.size(), time_p_out.size(), p_out.size(), Q.size(), time_Q.size() });
 
 	// Открываем файл для записи
 	ofstream file(filename);
@@ -599,30 +600,61 @@ void print_data_to_csv(const vector<double>& time,
 	// Проверяем, открыт ли файл успешно
 	if (file.is_open()) {
 		// Записываем заголовки столбцов
-		file << "Time; Density; Viscosity; Time Pressure In; Time Pressure Out; Time Flow Rate\n";
-
-		// Определяем размер вектора времени (все векторы должны иметь одинаковый размер)
-		size_t vectorSize = time.size();
+		file << "Time Density; Density; Time Viscosity; Viscosity; Time Pressure In; Pressure In; Time Pressure Out; Pressure Out; Time Flow Rate; Flow Rate\n";
 
 		// Записываем данные из векторов
-		for (std::size_t i = 0; i < maxLength; ++i) {
+		for (size_t i = 0; i < maxLength; ++i) {
 			// Если индекс находится в пределах длины вектора, записываем значение, иначе записываем пустую ячейку
-			file << (i < time.size() ? std::to_string(time[i]) : "") << ";"
-				<< (i < rho_and_nu_in_0.size() ? std::to_string(rho_and_nu_in_0[i]) : "") << ";"
-				<< (i < rho_and_nu_in_1.size() ? std::to_string(rho_and_nu_in_1[i]) : "") << ";"
-				<< (i < time_p_in.size() ? std::to_string(time_p_in[i]) : "") << ";"
-				<< (i < time_p_out.size() ? std::to_string(time_p_out[i]) : "") << ";"
-				<< (i < time_Q.size() ? std::to_string(time_Q[i]) : "") << "\n";
+			file << (i < time_rho.size() ? to_string(time_rho[i]) : "") << ";"
+				<< (i < rho_and_nu_in_0.size() ? to_string(rho_and_nu_in_0[i]) : "") << ";"
+				<< (i < time_nu.size() ? to_string(time_nu[i]) : "") << ";"
+				<< (i < rho_and_nu_in_1.size() ? to_string(rho_and_nu_in_1[i]) : "") << ";"
+				<< (i < time_p_in.size() ? to_string(time_p_in[i]) : "") << ";"
+				<< (i < p_in.size() ? to_string(p_in[i]) : "") << ";"
+				<< (i < time_p_out.size() ? to_string(time_p_out[i]) : "") << ";"
+				<< (i < p_out.size() ? to_string(p_out[i]) : "") << ";"
+				<< (i < time_Q.size() ? to_string(time_Q[i]) : "") << ";"
+				<< (i < Q.size() ? to_string(Q[i]) : "") << "\n";
 		}
-
 		// Закрываем файл
 		file.close();
-		cout << "Запись прошла успешно в файл " << filename << endl;
-	}
-	else {
-		cerr << "Невозможно открыть файл " << filename << endl;
 	}
 }
+
+
+void print_layers(const double dt, 
+	const vector<double>& layer, 
+	const wstring& filename)
+{
+	ofstream  file(filename, ios::app);
+	if (dt == 0)
+	{
+		// Если файл существует, очищаем его содержимое
+		if (file.is_open()) {
+			file.close();
+			file.open(filename, ios::out | ios::trunc);
+		}
+		// Если файл не существует, создаем новый
+		else {
+			file.open(filename, ios::out);
+		}
+		// Файл существует, но file.is_open() возвращает False
+		if (!file.is_open()) {
+			file.clear();  // Очищаем флаг ошибки
+			file.open(filename, ios::out | ios::trunc);
+		}
+	}
+	if (file.is_open()) {
+		file << to_string(dt) << ";";
+		for (int j = 0; j < layer.size(); j++)
+		{
+			file << to_string(layer[j]) << ";";
+		}
+		file << "\n";
+		file.close();
+	}
+}
+
 TEST(Block_3, Task_2)
 {
 	simple_pipe_properties simple_pipe;
@@ -634,40 +666,55 @@ TEST(Block_3, Task_2)
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
 	double Q = calc_flow(speed, pipe.internal_diameter);
 	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {}};
-
-	vector<double> time_row = {0, 60, 120, 180, 240, 300, 360};
-	vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880};
-	vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
-
-	vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880};
-	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6};
-
-	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6};
-	vector<double> time_Q_row = { Q, 0.20, 0.21, 0.20, 0.18, 0.21, 0.21 };
+	
+	std::srand(std::time(nullptr));
+	vector<double> time_row;
+	for (double time = 0.0; time <= 360.0; time += 10.0)
+		time_row.push_back(time);
+	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_rho_in_row[i] = rho - abs(rho * 0.05 * std::rand() / RAND_MAX);
+	}
+	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);	
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_nu_in_row[i] = nu - abs(nu * 0.2 * std::rand() / RAND_MAX);
+	}
+	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
+	vector<double> time_nu_out_row = vector<double>(time_row.size(), nu);
+	vector<double> time_p_in_row = vector<double>(time_row.size(), p_0);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_p_in_row[i] = p_0 - abs(p_0 * 2e-2 * std::rand() / RAND_MAX);
+	}
+	vector<double> time_Q_row = vector<double>(time_row.size(), Q);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_Q_row[i] = Q - abs(Q * 0.1 * std::rand() / RAND_MAX);
+	}
 
 	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
 	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+
 	buffer.advance(+1);
 	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
 	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
 
-	vector<double> new_time_row;
-
+	vector<double> new_time_row, new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile, initial_p_profile;
+	vector<double> diff_p_profile = vector<double>(pipe.n);
 	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
 	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
 
-
-	vector<double> new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile;
-
-	simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
-
-
 	double dt = 0;
+
 	euler_solver_with_MOC e_solver(pipe, task);
-	vector<vector<double>> some_buffer;
-	wstring p_profile_file = L"p_profile.csv";
-	wstring rho_profile_file = L"rho_profile.csv";
-	wstring nu_profile_file = L"nu_profile.csv";
+
+	wstring folder_path = L"research\\2024_02_block_3\\task_2\\research_out";
+	wstring p_profile_file = folder_path + L"\\p_profile.csv";
+	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
+	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
+	wstring diff_p_profile_file = folder_path + L"\\diff_p_profile.csv";
 
 	do {
 		new_time_row.push_back(dt);
@@ -681,46 +728,52 @@ TEST(Block_3, Task_2)
 
 		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
 
+		simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
+
 		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
 		task.rho_profile = buffer.current()[0];
 		task.nu_profile = buffer.current()[1];
 		task.p_0 = new_time_p_in_row.back();
 		task.Q = new_time_Q_row.back();
 		p_profile = e_solver.euler_solver_PQ();
+		if (dt == 0)
+			initial_p_profile = p_profile;
 		new_time_p_out_row.push_back(p_profile.back());
-		simple_moc.print_layers(dt, p_profile, p_profile_file);
-		simple_moc.print_layers(dt, task.rho_profile, rho_profile_file);
-		simple_moc.print_layers(dt, task.nu_profile, nu_profile_file);
-		//buffer.advance(+1);
-
-		/////////////////////////////
-		some_buffer = buffer.current();
-		buffer.current() = buffer.previous();
-		buffer.previous() = some_buffer;
-		/////////////////////////////
-
+		std::transform(initial_p_profile.begin(), initial_p_profile.end(), p_profile.begin(), diff_p_profile.begin(),
+			[](double initial, double current) {return initial - current;  });
+		print_layers(dt, p_profile, p_profile_file);
+		print_layers(dt, buffer.current()[0], rho_profile_file);
+		print_layers(dt, buffer.current()[1], nu_profile_file);
+		print_layers(dt, diff_p_profile, diff_p_profile_file);
+		buffer.advance(+1);
 		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
 		//все готово для следующего шага, интерполированная скорость есть
-	} while (dt < time_row.back());
-	
-	string filename_initial = "initial_data.csv";
+	} while (dt < time_row.back());	
+	wstring filename_initial = folder_path + L"\\initial_data.csv";
 	print_data_to_csv(
 		time_row,
 		time_rho_in_row,
+		time_row,
 		time_nu_in_row,
+		time_row,
 		time_p_in_row,
 		{},
+		{},
+		time_row,
 		time_Q_row,
 		filename_initial
 	);
-	
-	string filename_final = "final_data.csv";
+	wstring filename_final = folder_path + L"\\final_data.csv";
 	print_data_to_csv(
 		new_time_row,
 		rho_and_nu_in[0],
+		new_time_row,
 		rho_and_nu_in[1],
+		new_time_row,
 		new_time_p_in_row,
+		new_time_row,
 		new_time_p_out_row,
+		new_time_row,
 		new_time_Q_row,
 		filename_final
 	);
@@ -738,55 +791,74 @@ TEST(Block_3, Task_3)
 	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
 	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
 
-	vector<double> time_row = { 0, 60, 120, 180, 240, 300, 360 };
-	vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880 };
-	vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
+	//vector<double> time_row = { 0, 60, 120, 180, 240, 300, 360 };
+	//vector<double> time_rho_in_row = { rho, 880, 880, 890, 890, 880, 880 };
+	//vector<double> time_nu_in_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
 
-	vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880 };
-	vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
+	//vector<double> time_rho_out_row = { rho, 880, 880, 890, 890, 880, 880 };
+	//vector<double> time_nu_out_row = { nu, 13e-6, 13e-6, 14e-6, 14e-6, 13e-6, 13e-6 };
 
-	vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6 };
-	vector<double> time_p_out_row = { p_L, 5.357e6, 5.357e6, 5.458e6, 5.458e6, 5.359e6, 5.359e6 };
+	//vector<double> time_p_in_row = { p_0, 5.8e6, 5.8e6, 5.9e6, 5.9e6, 5.8e6, 5.8e6 };
+	//vector<double> time_p_out_row = { p_L, 5.357e6, 5.357e6, 5.458e6, 5.458e6, 5.359e6, 5.359e6 };
 
-//	vector<double> time_Q_row = { Q, 0.20, 0.21, 0.20, 0.18, 0.21, 0.21 };
+	std::srand(std::time(nullptr));
+	vector<double> time_row;
+	for (double time = 0.0; time <= 360.0; time += 10.0)
+		time_row.push_back(time);
+	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_rho_in_row[i] = rho - abs(rho * 0.005 * std::rand() / RAND_MAX);
+	}
+	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_nu_in_row[i] = nu - abs(nu * 0.002 * std::rand() / RAND_MAX);
+	}
+	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
+	vector<double> time_nu_out_row = vector<double>(time_row.size(), nu);
+	vector<double> time_p_in_row = vector<double>(time_row.size(), p_0);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_p_in_row[i] = p_0 - abs(p_0 * 2e-4 * std::rand() / RAND_MAX);
+	}
+
+	vector<double> time_p_out_row = vector<double>(time_row.size(), p_L);
+	for (size_t i = 5; i <= 36; i++)
+	{
+		time_p_out_row[i] = p_L - abs(p_L * 2e-4 * std::rand() / RAND_MAX);
+	}
 
 	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
 	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+
 	buffer.advance(+1);
 	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
 	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
 	
 	task.rho_profile = buffer.previous()[0];
 	task.nu_profile = buffer.previous()[1];
-	vector<double> new_time_row;
 
+	vector<double> new_time_row, new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile;
 	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
 	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
-
-	vector<double> new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile;
-
-	simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
 
 	double dt = 0;
 	
 	newton_solver_PP_with_euler_with_MOC n_solver(pipe, task);
-	euler_solver_with_MOC e_solver(pipe, task);
 	fixed_solver_parameters_t<1, 0> parameters;
 	// Создание структуры для записи результатов расчета
 	fixed_solver_result_t<1> result;
 
-	vector<vector<double>> some_buffer;
-	size_t counter = 0;
-
 	double Q_approx = 0.19;
-	double dt_debug;
-
+	wstring folder_path = L"research\\2024_02_block_3\\task_3\\research_out";
+	wstring p_profile_file = folder_path + L"\\p_profile.csv";
+	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
+	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
 	do {
 		new_time_row.push_back(dt);
-
 		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
 		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
-
 		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_out_row, dt));
 		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_out_row, dt));
 
@@ -794,10 +866,255 @@ TEST(Block_3, Task_3)
 		new_time_p_out_row.push_back(linear_interpolator(time_row, time_p_out_row, dt));
 
 		fixed_newton_raphson<1>::solve_dense(n_solver, { Q_approx }, parameters, &result);
-
 		task.Q = result.argument;
 		new_time_Q_row.push_back(task.Q);
+		simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());		
+		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
+		task.rho_profile = buffer.current()[0];
+		task.nu_profile = buffer.current()[1];
+		task.rho = task.rho_profile[0];
+		task.nu = task.nu_profile[0];
+		task.p_0 = new_time_p_in_row.back();
+		task.p_L = new_time_p_out_row.back();		
+		p_profile = n_solver.get_p_profile();		
+		print_layers(dt, p_profile, p_profile_file);
+		print_layers(dt, buffer.current()[0], rho_profile_file);
+		print_layers(dt, buffer.current()[1], nu_profile_file);
+		buffer.advance(+1);
+		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
+		//все готово для следующего шага, интерполированная скорость есть
+	} while (dt < time_row.back());
+	wstring filename_initial = folder_path + L"\\initial_data.csv";
+	print_data_to_csv(
+		time_row,
+		time_rho_in_row,
+		time_row,
+		time_nu_in_row,
+		time_row,
+		time_p_in_row,
+		time_row,
+		time_p_out_row,
+		{},
+		{},
+		filename_initial
+	);
+	wstring filename_final = folder_path + L"\\final_data.csv";
+	print_data_to_csv(
+		new_time_row,
+		rho_and_nu_in[0],
+		new_time_row,
+		rho_and_nu_in[1],
+		new_time_row,
+		new_time_p_in_row,
+		new_time_row,
+		new_time_p_out_row,
+		new_time_row,
+		new_time_Q_row,
+		filename_final
+	);
+}
 
+TEST(Block_3, Task_2_One_Parameter)
+{
+	simple_pipe_properties simple_pipe;
+	simple_pipe.diameter = 0.72;
+	simple_pipe.length = 100e3;
+	simple_pipe.dx = 100;
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 0.0, speed = 0.5;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	double Q = calc_flow(speed, pipe.internal_diameter);
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+	
+	vector<double> time_row;
+	for (double time = 0.0; time <= 150000.0; time += 100.0) 
+		time_row.push_back(time);
+	
+	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
+	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);
+	//std::srand(std::time(nullptr));
+	for (size_t i = 300; i <= time_row.size() - 1/*200*/; i++)
+	{
+		time_rho_in_row[i] = 800;
+		//time_nu_in_row[i] = 13e-6;
+		//time_nu_in_row[i] = nu  + nu * 0.2 * std::rand() / RAND_MAX;
+	}
+	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
+	vector<double> time_nu_out_row = vector<double>(time_row.size(), nu);
+
+	vector<double> time_p_in_row = vector<double>(time_row.size(), p_0);
+	vector<double> time_Q_row = vector<double>(time_row.size(), Q);
+	for (size_t i = 1000; i <= time_row.size() - 1/*200*/; i++)
+	{
+		if (i < 1000) {
+			time_Q_row[i] = calc_flow(0.55, pipe.internal_diameter);
+		}
+		else {
+			time_Q_row[i] = calc_flow(1.5, pipe.internal_diameter);
+		}
+	}
+
+
+	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
+	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+
+	buffer.advance(+1);
+	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
+	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
+
+	vector<double> new_time_row, new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile, initial_p_profile;
+	vector<double> diff_p_profile = vector<double>(pipe.n);
+	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
+	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
+
+	double dt = 0;
+
+	euler_solver_with_MOC e_solver(pipe, task);
+
+	string path = string("../QuasiStationaryIsometricModel/research/2024_02_block_3/task_2_change_rho_and_Q/research_out/");
+
+	filesystem::create_directories(path);
+
+	wstring folder_path = L"research\\2024_02_block_3\\task_2_change_rho_and_Q\\research_out";
+	wstring p_profile_file = folder_path + L"\\p_profile.csv";
+	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
+	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
+	wstring diff_p_profile_file = folder_path + L"\\diff_p_profile.csv";
+
+	do {
+		new_time_row.push_back(dt);
+		task.Q = linear_interpolator(time_row, time_Q_row, dt);
+		new_time_Q_row.push_back(task.Q);
+		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
+		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
+
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_out_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_out_row, dt));
+
+		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
+
+		simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
+
+		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
+		task.rho_profile = buffer.current()[0];
+		task.nu_profile = buffer.current()[1];
+		task.p_0 = new_time_p_in_row.back();
+		task.Q = new_time_Q_row.back();
+		p_profile = e_solver.euler_solver_PQ();
+		if (dt == 0)
+			initial_p_profile = p_profile;
+		new_time_p_out_row.push_back(p_profile.back());
+		std::transform(initial_p_profile.begin(), initial_p_profile.end(), p_profile.begin(), diff_p_profile.begin(),
+			[](double initial, double current) {return current - initial;  });
+		print_layers(dt, p_profile, p_profile_file);
+		print_layers(dt, buffer.current()[0], rho_profile_file);
+		print_layers(dt, buffer.current()[1], nu_profile_file);
+		print_layers(dt, diff_p_profile, diff_p_profile_file);
+		buffer.advance(+1);
+		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
+		//все готово для следующего шага, интерполированная скорость есть
+	} while (dt <= time_row.back());
+	wstring filename_initial = folder_path + L"\\initial_data.csv";
+	print_data_to_csv(
+		time_row,
+		time_rho_in_row,
+		time_row,
+		time_nu_in_row,
+		time_row,
+		time_p_in_row,
+		{},
+		{},
+		time_row,
+		time_Q_row,
+		filename_initial
+	);
+	wstring filename_final = folder_path + L"\\final_data.csv";
+	print_data_to_csv(
+		new_time_row,
+		rho_and_nu_in[0],
+		new_time_row,
+		rho_and_nu_in[1],
+		new_time_row,
+		new_time_p_in_row,
+		new_time_row,
+		new_time_p_out_row,
+		new_time_row,
+		new_time_Q_row,
+		filename_final
+	);
+}
+
+
+TEST(Block_3, Task_3_One_Parameter)
+{
+	simple_pipe_properties simple_pipe;
+	simple_pipe.diameter = 0.72;
+	simple_pipe.length = 100e3;
+	simple_pipe.dx = 100;
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 5.16e6, Q = 0;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+	vector<double> time_row;
+	for (double time = 0.0; time <= 250000.0; time += 100.0)
+		time_row.push_back(time);
+	vector<double> time_rho_in_row = vector<double>(time_row.size(), rho);
+	vector<double> time_nu_in_row = vector<double>(time_row.size(), nu);
+	//std::srand(std::time(nullptr));
+	for (size_t i = 100; i <= time_row.size()-1/*200*/ ; i++)
+	{
+		time_nu_in_row[i] = 13e-6;
+		//time_rho_in_row[i] = 880;
+	}
+
+	vector<double> time_rho_out_row = vector<double>(time_row.size(), rho);
+	vector<double> time_nu_out_row = vector<double>(time_row.size(), nu);
+	vector<double> time_p_in_row = vector<double>(time_row.size(), p_0);
+	vector<double> time_p_out_row = vector<double>(time_row.size(), p_L);
+
+
+	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
+	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+
+	buffer.advance(+1);
+	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
+	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
+
+	task.rho_profile = buffer.previous()[0];
+	task.nu_profile = buffer.previous()[1];
+
+	vector<double> new_time_row, new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile, initial_p_profile;
+	vector<double> diff_p_profile = vector<double>(pipe.n);
+	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
+	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
+
+	double dt = 0;
+
+	newton_solver_PP_with_euler_with_MOC n_solver(pipe, task);
+	fixed_solver_parameters_t<1, 0> parameters;
+	// Создание структуры для записи результатов расчета
+	fixed_solver_result_t<1> result;
+
+	double Q_approx = 0.195;
+	wstring folder_path = L"research\\2024_02_block_3\\task_3_change_nu\\research_out";
+	wstring p_profile_file = folder_path + L"\\p_profile.csv";
+	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
+	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
+	wstring diff_p_profile_file = folder_path + L"\\diff_p_profile.csv";
+	do {
+		new_time_row.push_back(dt);
+		rho_and_nu_in[0].push_back(linear_interpolator(time_row, time_rho_in_row, dt));
+		rho_and_nu_in[1].push_back(linear_interpolator(time_row, time_nu_in_row, dt));
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row, time_rho_out_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row, time_nu_out_row, dt));
+
+		new_time_p_in_row.push_back(linear_interpolator(time_row, time_p_in_row, dt));
+		new_time_p_out_row.push_back(linear_interpolator(time_row, time_p_out_row, dt));
+
+		fixed_newton_raphson<1>::solve_dense(n_solver, { Q_approx }, parameters, &result);
+		task.Q = result.argument;
+		new_time_Q_row.push_back(task.Q);
+		simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
 		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
 		task.rho_profile = buffer.current()[0];
 		task.nu_profile = buffer.current()[1];
@@ -805,24 +1122,329 @@ TEST(Block_3, Task_3)
 		task.nu = task.nu_profile[0];
 		task.p_0 = new_time_p_in_row.back();
 		task.p_L = new_time_p_out_row.back();
-		
-		
-
-		p_profile = e_solver.euler_solver_PQ();
-		
-
-		//buffer.advance(+1);
-
-		/////////////////////////////
-		some_buffer = buffer.current();
-		buffer.current() = buffer.previous();
-		buffer.previous() = some_buffer;
-		/////////////////////////////
-		dt_debug = simple_moc.prepare_step();
+		p_profile = n_solver.get_p_profile();
+		if (dt == 0)
+			initial_p_profile = p_profile;
+		std::transform(initial_p_profile.begin(), initial_p_profile.end(), p_profile.begin(), diff_p_profile.begin(),
+			[](double initial, double current) {return current - initial;  });
+		print_layers(dt, p_profile, p_profile_file);
+		print_layers(dt, buffer.current()[0], rho_profile_file);
+		print_layers(dt, buffer.current()[1], nu_profile_file);
+		print_layers(dt, diff_p_profile, diff_p_profile_file);
+		buffer.advance(+1);
 		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
 		//все готово для следующего шага, интерполированная скорость есть
-		counter++;
 	} while (dt < time_row.back());
+	wstring filename_initial = folder_path + L"\\initial_data.csv";
+	print_data_to_csv(
+		time_row,
+		time_rho_in_row,
+		time_row,
+		time_nu_in_row,
+		time_row,
+		time_p_in_row,
+		time_row,
+		time_p_out_row,
+		{},
+		{},
+		filename_initial
+	);
+	wstring filename_final = folder_path + L"\\final_data.csv";
+	print_data_to_csv(
+		new_time_row,
+		rho_and_nu_in[0],
+		new_time_row,
+		rho_and_nu_in[1],
+		new_time_row,
+		new_time_p_in_row,
+		new_time_row,
+		new_time_p_out_row,
+		new_time_row,
+		new_time_Q_row,
+		filename_final
+	);
+}
+
+TEST(Block_3, Task_2_SDKU)
+{
+	simple_pipe_properties simple_pipe;
+	simple_pipe.diameter = 0.72;
+	simple_pipe.length = 500;
+	simple_pipe.dx = 10;
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 0.0, speed = 0.5;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	double Q = calc_flow(speed, pipe.internal_diameter);
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+
+	std::srand(std::time(nullptr));
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<double> dis(7.0, 10.0);
+
+	vector<double> time_row_for_rho;
+	for (double time = 0.0; time <= 360.0; time += dis(gen))
+		time_row_for_rho.push_back(time);
+	vector<double> time_rho_in_row = vector<double>(time_row_for_rho.size(), rho);
+	for (size_t i = 0; i <= time_row_for_rho.size() - 1; i++)
+	{
+		time_rho_in_row[i] = rho - abs(rho * 0.001 * std::rand() / RAND_MAX);
+	}
+
+	vector<double> time_row_for_nu;
+	for (double time = 0.0; time <= 360.0; time += dis(gen))
+		time_row_for_nu.push_back(time);
+	vector<double> time_nu_in_row = vector<double>(time_row_for_nu.size(), nu);
+	for (size_t i = 0; i <= time_row_for_nu.size() - 1; i++)
+	{
+		time_nu_in_row[i] = nu - abs(nu * 0.1 * std::rand() / RAND_MAX);
+	}
+
+	vector<double> time_rho_out_row = vector<double>(time_row_for_rho.size(), rho);
+	vector<double> time_nu_out_row = vector<double>(time_row_for_nu.size(), nu);
+
+	vector<double> time_row_for_p_in;
+	for (double time = 0.0; time <= 360.0; time += dis(gen))
+		time_row_for_p_in.push_back(time);
+	vector<double> time_p_in_row = vector<double>(time_row_for_p_in.size(), p_0);
+	for (size_t i = 0; i <= time_row_for_p_in.size() - 1; i++)
+	{
+		time_p_in_row[i] = p_0 - abs(p_0 * 2e-4 * std::rand() / RAND_MAX);
+	}
+
+	vector<double> time_row_for_Q;
+	for (double time = 0.0; time <= 360.0; time += dis(gen))
+		time_row_for_Q.push_back(time);
+	vector<double> time_Q_row = vector<double>(time_row_for_Q.size(), Q);
+	for (size_t i = 0; i <= time_row_for_Q.size() - 1; i++)
+	{
+		time_Q_row[i] = Q - abs(Q * 0.1 * std::rand() / RAND_MAX);
+	}
+
+	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
+	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+
+	buffer.advance(+1);
+	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
+	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
+
+	vector<double> new_time_row, new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile, initial_p_profile;
+	vector<double> diff_p_profile = vector<double>(pipe.n);
+	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
+	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
+
+	double dt = 0;
+	double dt_debug;
+	euler_solver_with_MOC e_solver(pipe, task);
+
+	wstring folder_path = L"research\\2024_02_block_3\\task_2_SDKU\\research_out";
+	wstring p_profile_file = folder_path + L"\\p_profile.csv";
+	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
+	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
+	wstring diff_p_profile_file = folder_path + L"\\diff_p_profile.csv";
+
+	do {
+		new_time_row.push_back(dt);
+		task.Q = linear_interpolator(time_row_for_Q, time_Q_row, dt);
+		new_time_Q_row.push_back(task.Q);
+		rho_and_nu_in[0].push_back(linear_interpolator(time_row_for_rho, time_rho_in_row, dt));
+		rho_and_nu_in[1].push_back(linear_interpolator(time_row_for_nu, time_nu_in_row, dt));
+
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row_for_rho, time_rho_out_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row_for_nu, time_nu_out_row, dt));
+
+		new_time_p_in_row.push_back(linear_interpolator(time_row_for_p_in, time_p_in_row, dt));
+
+		simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
+
+		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
+		task.rho_profile = buffer.current()[0];
+		task.nu_profile = buffer.current()[1];
+		task.p_0 = new_time_p_in_row.back();
+		task.Q = new_time_Q_row.back();
+		p_profile = e_solver.euler_solver_PQ();
+		if (dt == 0)
+			initial_p_profile = p_profile;
+		new_time_p_out_row.push_back(p_profile.back());
+		std::transform(initial_p_profile.begin(), initial_p_profile.end(), p_profile.begin(), diff_p_profile.begin(),
+			[](double initial, double current) {return initial - current;  });
+		print_layers(dt, p_profile, p_profile_file);
+		print_layers(dt, buffer.current()[0], rho_profile_file);
+		print_layers(dt, buffer.current()[1], nu_profile_file);
+		print_layers(dt, diff_p_profile, diff_p_profile_file);
+		buffer.advance(+1);
+		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
+		dt_debug = simple_moc.prepare_step();
+		//все готово для следующего шага, интерполированная скорость есть
+	} while (dt < 360 - dt_debug);
+	wstring filename_initial = folder_path + L"\\initial_data.csv";
+	print_data_to_csv(
+		time_row_for_rho,
+		time_rho_in_row,
+		time_row_for_nu,
+		time_nu_in_row,
+		time_row_for_p_in,
+		time_p_in_row,
+		{},
+		{},
+		time_row_for_Q,
+		time_Q_row,
+		filename_initial
+	);
+	wstring filename_final = folder_path + L"\\final_data.csv";
+	print_data_to_csv(
+		new_time_row,
+		rho_and_nu_in[0],
+		new_time_row,
+		rho_and_nu_in[1],
+		new_time_row,
+		new_time_p_in_row,
+		new_time_row,
+		new_time_p_out_row,
+		new_time_row,
+		new_time_Q_row,
+		filename_final
+	);
+}
 
 
+TEST(Block_3, Task_3_SDKU)
+{
+	simple_pipe_properties simple_pipe;
+	simple_pipe.diameter = 0.72;
+	simple_pipe.length = 500;
+	simple_pipe.dx = 10;
+	double delta_d = 0.01, abs_roughness = 15e-6, z_0 = 50, z_L = 100,
+		rho = 900, nu = 15e-6, p_0 = 6e6, p_L = 5.557e6, Q = 0;
+	my_pipe_parameters pipe{ simple_pipe.length, simple_pipe.diameter, delta_d, abs_roughness, z_0, z_L, simple_pipe.dx };
+	my_task_parameters task{ pipe, rho, nu, p_0, p_L, Q, {}, {} };
+
+	std::srand(std::time(nullptr));
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<double> dis(7.0, 10.0);
+
+	vector<double> time_row_for_rho;
+	for (double time = 0.0; time <= 360.0; time += dis(gen))
+		time_row_for_rho.push_back(time);
+	vector<double> time_rho_in_row = vector<double>(time_row_for_rho.size(), rho);
+	for (size_t i = 0; i <= time_row_for_rho.size() - 1; i++)
+	{
+		time_rho_in_row[i] = rho - abs(rho * 0.001 * std::rand() / RAND_MAX);
+	}
+
+	vector<double> time_row_for_nu;
+	for (double time = 0.0; time <= 360.0; time += dis(gen))
+		time_row_for_nu.push_back(time);
+	vector<double> time_nu_in_row = vector<double>(time_row_for_nu.size(), nu);
+	for (size_t i = 0; i <= time_row_for_nu.size() - 1; i++)
+	{
+		time_nu_in_row[i] = nu - abs(nu * 0.1 * std::rand() / RAND_MAX);
+	}
+
+	vector<double> time_rho_out_row = vector<double>(time_row_for_rho.size(), rho);
+	vector<double> time_nu_out_row = vector<double>(time_row_for_nu.size(), nu);
+
+	vector<double> time_row_for_p_in;
+	for (double time = 0.0; time <= 360.0; time += dis(gen))
+		time_row_for_p_in.push_back(time);
+	vector<double> time_p_in_row = vector<double>(time_row_for_p_in.size(), p_0);
+	for (size_t i = 0; i <= time_row_for_p_in.size() - 1; i++)
+	{
+		time_p_in_row[i] = p_0 - abs(p_0 * 2e-4 * std::rand() / RAND_MAX);
+	}
+
+	vector<double> time_row_for_p_out;
+	for (double time = 0.0; time <= 360.0; time += dis(gen))
+		time_row_for_p_out.push_back(time);
+	vector<double> time_p_out_row = vector<double>(time_row_for_p_out.size(), p_L);
+	for (size_t i = 0; i <= time_row_for_p_out.size() - 1; i++)
+	{
+		time_p_out_row[i] = p_L - abs(p_L * 2e-4 * std::rand() / RAND_MAX);
+	}
+
+	vector<vector<double>> layer = vector<vector<double>>(2, vector<double>(pipe.n));
+	ring_buffer_t<vector<vector<double>>> buffer(2, layer);
+
+	buffer.advance(+1);
+	buffer.previous()[0] = vector<double>(buffer.previous()[0].size(), rho);
+	buffer.previous()[1] = vector<double>(buffer.previous()[1].size(), nu);
+
+	task.rho_profile = buffer.previous()[0];
+	task.nu_profile = buffer.previous()[1];
+
+	vector<double> new_time_row, new_time_p_in_row, new_time_p_out_row, new_time_Q_row, p_profile;
+	vector<vector<double>> rho_and_nu_in = vector<vector<double>>(2);
+	vector<vector<double>> rho_and_nu_out = vector<vector<double>>(2);
+
+	double dt = 0;
+	double dt_debug;
+	newton_solver_PP_with_euler_with_MOC n_solver(pipe, task);
+	fixed_solver_parameters_t<1, 0> parameters;
+	// Создание структуры для записи результатов расчета
+	fixed_solver_result_t<1> result;
+
+	double Q_approx = 0.19;
+	wstring folder_path = L"research\\2024_02_block_3\\task_3_SDKU\\research_out";
+	wstring p_profile_file = folder_path + L"\\p_profile.csv";
+	wstring rho_profile_file = folder_path + L"\\rho_profile.csv";
+	wstring nu_profile_file = folder_path + L"\\nu_profile.csv";
+	do {
+		new_time_row.push_back(dt);
+		rho_and_nu_in[0].push_back(linear_interpolator(time_row_for_rho, time_rho_in_row, dt));
+		rho_and_nu_in[1].push_back(linear_interpolator(time_row_for_nu, time_nu_in_row, dt));
+		rho_and_nu_out[0].push_back(linear_interpolator(time_row_for_rho, time_rho_out_row, dt));
+		rho_and_nu_out[1].push_back(linear_interpolator(time_row_for_nu, time_nu_out_row, dt));
+
+		new_time_p_in_row.push_back(linear_interpolator(time_row_for_p_in, time_p_in_row, dt));
+		new_time_p_out_row.push_back(linear_interpolator(time_row_for_p_out, time_p_out_row, dt));
+
+		fixed_newton_raphson<1>::solve_dense(n_solver, { Q_approx }, parameters, &result);
+		task.Q = result.argument;
+		new_time_Q_row.push_back(task.Q);
+		simple_moc_solver simple_moc(pipe, task, buffer.previous(), buffer.current());
+		simple_moc.step(new_time_row.size(), simple_moc.prepare_step(), rho_and_nu_in, rho_and_nu_out);
+		task.rho_profile = buffer.current()[0];
+		task.nu_profile = buffer.current()[1];
+		task.rho = task.rho_profile[0];
+		task.nu = task.nu_profile[0];
+		task.p_0 = new_time_p_in_row.back();
+		task.p_L = new_time_p_out_row.back();
+		p_profile = n_solver.get_p_profile();
+		print_layers(dt, p_profile, p_profile_file);
+		print_layers(dt, buffer.current()[0], rho_profile_file);
+		print_layers(dt, buffer.current()[1], nu_profile_file);
+		buffer.advance(+1);
+		dt += simple_moc.prepare_step(); // здесь используется task.Q для расчета шага
+		dt_debug = simple_moc.prepare_step();
+		//все готово для следующего шага, интерполированная скорость есть
+	} while (dt < 360 - dt_debug);
+	wstring filename_initial = folder_path + L"\\initial_data.csv";
+	print_data_to_csv(
+		time_row_for_rho,
+		time_rho_in_row,
+		time_row_for_nu,
+		time_nu_in_row,
+		time_row_for_p_in,
+		time_p_in_row,
+		time_row_for_p_out,
+		time_p_out_row,
+		{},
+		{},
+		filename_initial
+	);
+	wstring filename_final = folder_path + L"\\final_data.csv";
+	print_data_to_csv(
+		new_time_row,
+		rho_and_nu_in[0],
+		new_time_row,
+		rho_and_nu_in[1],
+		new_time_row,
+		new_time_p_in_row,
+		new_time_row,
+		new_time_p_out_row,
+		new_time_row,
+		new_time_Q_row,
+		filename_final
+	);
 }
